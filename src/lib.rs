@@ -1,7 +1,14 @@
-use amq_protocol::frame::AMQPFrame;
+use amq_protocol::{
+    frame::{AMQPFrame, ProtocolVersion, WriteContext},
+    protocol::{
+        connection::{AMQPMethod as ConnMethods, Start},
+        AMQPClass,
+    },
+    types::{FieldTable, LongString},
+};
 use anyhow::{bail, Result};
 use tokio::{
-    io::AsyncReadExt,
+    io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
 };
 
@@ -13,7 +20,7 @@ pub async fn server() -> Result<()> {
     loop {
         // The second item contains the IP and port of the new connection.
         let (socket, _) = listener.accept().await?;
-        process(socket).await;
+        process(socket).await?;
     }
 }
 pub struct Connection {
@@ -35,7 +42,9 @@ impl Connection {
         loop {
             match self.parse_frame() {
                 Ok((rest, frame)) => {
+                    let old_buffer_len = self.buffer.len();
                     self.buffer = rest.to_vec();
+                    self.cursor -= old_buffer_len - self.buffer.len();
                     return Ok(Some(frame));
                 }
                 Err(err) => {
@@ -66,26 +75,63 @@ impl Connection {
                 }
             } else {
                 // Update our cursor
-                if self.cursor != 0 {
-                    bail!("foo");
-                }
                 self.cursor += n;
             }
         }
     }
 
     fn parse_frame(&self) -> Result<(&[u8], AMQPFrame)> {
-        return amq_protocol::frame::parsing::parse_frame(&self.buffer[..]).map_err(|e| e.into());
+        return amq_protocol::frame::parse_frame(&self.buffer[..]).map_err(|e| e.into());
+    }
+
+    async fn write_frame(&mut self, frame: AMQPFrame) -> Result<()> {
+        let mut write_buffer = vec![];
+        write_buffer = amq_protocol::frame::gen_frame(&frame)(WriteContext {
+            write: write_buffer,
+            position: 0,
+        })
+        .unwrap()
+        .into_inner()
+        .0;
+        self.stream.write(&write_buffer).await?;
+        Ok(())
     }
 }
 
-async fn process(socket: TcpStream) {
+async fn process(socket: TcpStream) -> Result<()> {
     println!("Got socket {:?}", socket);
 
     let mut connection = Connection::new(socket);
 
     while let Some(frame) = connection.read_frame().await.unwrap() {
         println!("Frame: {:?}", frame);
+        match frame {
+            AMQPFrame::ProtocolHeader(version) => {
+                if version == ProtocolVersion::amqp_0_9_1() {
+                    connection
+                        .write_frame(AMQPFrame::Method(
+                            0,
+                            AMQPClass::Connection(ConnMethods::Start(Start {
+                                version_major: 0,
+                                version_minor: 9,
+                                server_properties: FieldTable::default(),
+                                mechanisms: LongString::default(),
+                                locales: LongString::default(),
+                            })),
+                        ))
+                        .await?;
+                } else {
+                    connection
+                        .write_frame(AMQPFrame::ProtocolHeader(ProtocolVersion::amqp_0_9_1()))
+                        .await?;
+                }
+            }
+            AMQPFrame::Method(_, _) => todo!(),
+            AMQPFrame::Header(_, _, _) => todo!(),
+            AMQPFrame::Body(_, _) => todo!(),
+            AMQPFrame::Heartbeat(_) => todo!(),
+        }
     }
     println!("end process");
+    Ok(())
 }
