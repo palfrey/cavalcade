@@ -8,8 +8,9 @@ edition = "2021"
 [dependencies]
 amq-protocol = "*"
 serde = "*"
-tokio = "*"
+tokio = {version="*", features=["net", "io-util", "rt", "macros", "rt-multi-thread"] }
 anyhow = "*"
+bytes = "*"
 
 [dev-dependencies]
 celery = "0.4.0-rcn.11" 

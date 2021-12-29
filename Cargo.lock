@@ -136,6 +136,7 @@ version = "0.1.0"
 dependencies = [
  "amq-protocol",
  "anyhow",
+ "bytes",
  "celery",
  "serde",
  "tokio",
