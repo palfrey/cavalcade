@@ -34,7 +34,8 @@ impl Connection {
     pub async fn read_frame(&mut self) -> Result<Option<AMQPFrame>> {
         loop {
             match self.parse_frame() {
-                Ok(frame) => {
+                Ok((rest, frame)) => {
+                    self.buffer = rest.to_vec();
                     return Ok(Some(frame));
                 }
                 Err(err) => {
@@ -73,10 +74,8 @@ impl Connection {
         }
     }
 
-    fn parse_frame(&self) -> Result<AMQPFrame> {
-        return amq_protocol::frame::parsing::parse_frame(&self.buffer[..])
-            .map(|r| r.1)
-            .map_err(|e| e.into());
+    fn parse_frame(&self) -> Result<(&[u8], AMQPFrame)> {
+        return amq_protocol::frame::parsing::parse_frame(&self.buffer[..]).map_err(|e| e.into());
     }
 }
 
