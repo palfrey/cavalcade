@@ -1,4 +1,4 @@
-use std::{borrow::Cow, time::Duration};
+use std::borrow::Cow;
 
 use amq_protocol::{
     frame::{AMQPFrame, ProtocolVersion, WriteContext},
@@ -14,7 +14,7 @@ use amq_protocol::{
     },
     types::{FieldTable, LongString, ShortString},
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 use lazy_static::lazy_static;
 use regex::bytes::Regex;
 use tokio::{
@@ -73,12 +73,16 @@ impl Connection {
             let n = self.stream.read(&mut self.buffer[self.cursor..]).await?;
 
             println!("Got {} bytes", n);
-            if n == 0 {
-                // wait briefly as apparently there's no data currently available
-                tokio::time::sleep(Duration::from_secs(1)).await;
+            if 0 == n {
+                if self.cursor == 0 {
+                    return Ok(None);
+                } else {
+                    bail!("connection reset by peer");
+                }
+            } else {
+                // Update our cursor
+                self.cursor += n;
             }
-            // Update our cursor
-            self.cursor += n;
         }
     }
 
