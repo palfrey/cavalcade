@@ -96,6 +96,11 @@ impl Connection {
         self.stream.write(&write_buffer).await?;
         Ok(())
     }
+
+    async fn close(&mut self) -> Result<()> {
+        self.stream.shutdown().await?;
+        Ok(())
+    }
 }
 
 async fn process(socket: TcpStream) -> Result<()> {
@@ -124,6 +129,7 @@ async fn process(socket: TcpStream) -> Result<()> {
                     connection
                         .write_frame(AMQPFrame::ProtocolHeader(ProtocolVersion::amqp_0_9_1()))
                         .await?;
+                    connection.close().await?
                 }
             }
             AMQPFrame::Method(_, _) => todo!(),
