@@ -1,0 +1,6 @@
+FROM python:3.7
+WORKDIR /work
+RUN wget https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh && chmod +x wait-for-it.sh && mv wait-for-it.sh /usr/local/bin/wait-for-it
+COPY requirements.txt /work/
+RUN pip install -r requirements.txt
+COPY test_tasks.py /work

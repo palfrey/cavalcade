@@ -24,7 +24,7 @@ use tokio::{
 
 pub async fn server() -> Result<()> {
     // Bind the listener to the address
-    let listener = TcpListener::bind("127.0.0.1:5672").await?;
+    let listener = TcpListener::bind("0.0.0.0:5672").await?;
     println!("Listening");
 
     loop {

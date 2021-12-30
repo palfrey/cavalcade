@@ -2,8 +2,12 @@ from celery import Celery
 import sys
 import threading
 import time
+import os
 
-app = Celery('hello', broker='amqp://guest@localhost//', config_source={'broker_connection_retry': False, 'broker_transport_options': {'max_retries': 0}})
+AMQP_HOST = os.environ.get("AMQP_HOST", "localhost")
+print("host", AMQP_HOST)
+
+app = Celery('hello', broker=f"amqp://guest@{AMQP_HOST}//", config_source={'broker_connection_retry': False, 'broker_transport_options': {'max_retries': 0}})
 
 @app.task
 def hello():
@@ -18,7 +22,7 @@ if __name__ == '__main__':
     ct.setDaemon(True)
     ct.start()
 
-    print(hello.delay())
+    print("hello", hello.delay())
     
     time.sleep(5)
 

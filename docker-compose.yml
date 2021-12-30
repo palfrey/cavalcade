@@ -1,0 +1,17 @@
+version: "3"
+services:
+  cavalcade:
+    build: .
+    volumes:
+      - .:/work  
+    command: cargo run
+
+  test-celery:
+    build:
+      context: tests
+      dockerfile: Dockerfile.celery_test
+    environment:
+      AMQP_HOST: cavalcade
+    command: wait-for-it --host=cavalcade --port=5672 --timeout=0 --strict -- python test_tasks.py worker --loglevel=DEBUG
+    volumes:
+      - ./tests:/work
