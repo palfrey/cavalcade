@@ -3,7 +3,12 @@ use std::borrow::Cow;
 use amq_protocol::{
     frame::{AMQPFrame, ProtocolVersion, WriteContext},
     protocol::{
-        connection::{AMQPMethod as ConnMethods, Secure, Start},
+        basic::{AMQPMethod as BasicMethods, QosOk},
+        channel::{AMQPMethod as ChanMethods, CloseOk as ChanCloseOk, OpenOk as ChanOpenOk},
+        connection::{
+            AMQPMethod as ConnMethods, CloseOk as ConnCloseOk, OpenOk as ConnOpenOk, Start, Tune,
+        },
+        queue::{AMQPMethod as QueueMethods, DeclareOk},
         AMQPClass,
     },
     types::{FieldTable, LongString, ShortString},
@@ -51,19 +56,15 @@ impl Connection {
                     self.cursor -= old_buffer_len - self.buffer.len();
                     return Ok(Some(frame));
                 }
-                Err(err) => {
-                    println!("parse error: {}", err);
-                }
+                Err(_err) => {}
             }
 
-            println!("getting more data at cursor {}", self.cursor);
+            // println!("getting more data at cursor {}", self.cursor);
 
             // Ensure the buffer has capacity
             if self.buffer.len() == self.cursor {
                 // Grow the buffer
-                bail!("resize");
-                // println!("resize");
-                // self.buffer.resize(self.cursor * 2, 0);
+                self.buffer.resize(self.cursor * 2, 0);
             }
 
             // Read into the buffer, tracking the number
@@ -89,6 +90,7 @@ impl Connection {
     }
 
     async fn write_frame(&mut self, frame: AMQPFrame) -> Result<()> {
+        println!("Output Frame: {:?}", frame);
         let mut write_buffer = vec![];
         write_buffer = amq_protocol::frame::gen_frame(&frame)(WriteContext {
             write: write_buffer,
@@ -113,7 +115,7 @@ async fn process(socket: TcpStream) -> Result<()> {
     let mut connection = Connection::new(socket);
 
     while let Some(frame) = connection.read_frame().await.unwrap() {
-        println!("Frame: {:?}", frame);
+        println!("Input Frame: {:?}", frame);
         match frame {
             AMQPFrame::ProtocolHeader(version) => {
                 if version == ProtocolVersion::amqp_0_9_1() {
@@ -122,10 +124,10 @@ async fn process(socket: TcpStream) -> Result<()> {
                             0,
                             AMQPClass::Connection(ConnMethods::Start(Start {
                                 version_major: 0,
-                                version_minor: 9,
+                                version_minor: 1,
                                 server_properties: FieldTable::default(),
                                 mechanisms: LongString::from("PLAIN"),
-                                locales: LongString::default(),
+                                locales: LongString::from("en_US"),
                             })),
                         ))
                         .await?;
@@ -159,9 +161,78 @@ async fn process(socket: TcpStream) -> Result<()> {
                         connection
                             .write_frame(AMQPFrame::Method(
                                 0,
-                                AMQPClass::Connection(ConnMethods::Secure(Secure {
-                                    challenge: LongString::from("PLAIN"),
+                                AMQPClass::Connection(ConnMethods::Tune(Tune {
+                                    channel_max: 1000,
+                                    frame_max: 1000,
+                                    heartbeat: 1000,
                                 })),
+                            ))
+                            .await?;
+                    }
+                    ConnMethods::Close(_close) => {
+                        connection
+                            .write_frame(AMQPFrame::Method(
+                                0,
+                                AMQPClass::Connection(ConnMethods::CloseOk(ConnCloseOk {})),
+                            ))
+                            .await?;
+                    }
+                    ConnMethods::TuneOk(_) => {}
+                    ConnMethods::Open(open) => {
+                        if open.virtual_host == ShortString::from("/") {
+                            connection
+                                .write_frame(AMQPFrame::Method(
+                                    0,
+                                    AMQPClass::Connection(ConnMethods::OpenOk(ConnOpenOk {})),
+                                ))
+                                .await?;
+                        }
+                    }
+                    _ => todo!(),
+                },
+                AMQPClass::Channel(chanmethod) => match chanmethod {
+                    ChanMethods::Open(open) => {
+                        connection
+                            .write_frame(AMQPFrame::Method(
+                                channel,
+                                AMQPClass::Channel(ChanMethods::OpenOk(ChanOpenOk {})),
+                            ))
+                            .await?;
+                    }
+                    ChanMethods::Close(close) => {
+                        connection
+                            .write_frame(AMQPFrame::Method(
+                                channel,
+                                AMQPClass::Channel(ChanMethods::CloseOk(ChanCloseOk {})),
+                            ))
+                            .await?;
+                        // connection.close().await?
+                    }
+                    _ => todo!(),
+                },
+                AMQPClass::Queue(queuemethod) => match queuemethod {
+                    QueueMethods::Declare(declare) => {
+                        println!("Declared queue {}", declare.queue);
+                        connection
+                            .write_frame(AMQPFrame::Method(
+                                channel,
+                                AMQPClass::Queue(QueueMethods::DeclareOk(DeclareOk {
+                                    queue: declare.queue,
+                                    message_count: 0,
+                                    consumer_count: 0,
+                                })),
+                            ))
+                            .await?;
+                    }
+                    _ => todo!(),
+                },
+                AMQPClass::Basic(basicmethod) => match basicmethod {
+                    BasicMethods::Publish(publish) => {}
+                    BasicMethods::Qos(qos) => {
+                        connection
+                            .write_frame(AMQPFrame::Method(
+                                channel,
+                                AMQPClass::Basic(BasicMethods::QosOk(QosOk {})),
                             ))
                             .await?;
                     }
@@ -169,8 +240,11 @@ async fn process(socket: TcpStream) -> Result<()> {
                 },
                 _ => todo!(),
             },
-            AMQPFrame::Header(_, _, _) => todo!(),
-            AMQPFrame::Body(_, _) => todo!(),
+            AMQPFrame::Header(channel, class_id, content) => {}
+            AMQPFrame::Body(channel, content) => {
+                let string_content = String::from_utf8_lossy(&content);
+                println!("Content: {}", string_content);
+            }
             AMQPFrame::Heartbeat(_) => todo!(),
         }
     }
