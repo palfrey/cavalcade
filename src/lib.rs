@@ -3,12 +3,13 @@ use std::borrow::Cow;
 use amq_protocol::{
     frame::{AMQPFrame, ProtocolVersion, WriteContext},
     protocol::{
-        basic::{AMQPMethod as BasicMethods, QosOk},
+        basic::{AMQPMethod as BasicMethods, CancelOk, ConsumeOk, QosOk},
         channel::{AMQPMethod as ChanMethods, CloseOk as ChanCloseOk, OpenOk as ChanOpenOk},
         connection::{
             AMQPMethod as ConnMethods, CloseOk as ConnCloseOk, OpenOk as ConnOpenOk, Start, Tune,
         },
-        queue::{AMQPMethod as QueueMethods, DeclareOk},
+        exchange::{AMQPMethod as ExchangeMethods, DeclareOk as ExchangeDeclareOk},
+        queue::{AMQPMethod as QueueMethods, BindOk as QueueBindOk, DeclareOk as QueueDeclareOk},
         AMQPClass,
     },
     types::{FieldTable, LongString, ShortString},
@@ -29,7 +30,7 @@ pub async fn server() -> Result<()> {
     loop {
         // The second item contains the IP and port of the new connection.
         let (socket, _) = listener.accept().await?;
-        process(socket).await?;
+        tokio::spawn(process(socket));
     }
 }
 pub struct Connection {
@@ -216,7 +217,7 @@ async fn process(socket: TcpStream) -> Result<()> {
                         connection
                             .write_frame(AMQPFrame::Method(
                                 channel,
-                                AMQPClass::Queue(QueueMethods::DeclareOk(DeclareOk {
+                                AMQPClass::Queue(QueueMethods::DeclareOk(QueueDeclareOk {
                                     queue: declare.queue,
                                     message_count: 0,
                                     consumer_count: 0,
@@ -224,7 +225,14 @@ async fn process(socket: TcpStream) -> Result<()> {
                             ))
                             .await?;
                     }
-                    QueueMethods::Bind(_bind) => {}
+                    QueueMethods::Bind(_bind) => {
+                        connection
+                            .write_frame(AMQPFrame::Method(
+                                channel,
+                                AMQPClass::Queue(QueueMethods::BindOk(QueueBindOk {})),
+                            ))
+                            .await?;
+                    }
                     _ => todo!(),
                 },
                 AMQPClass::Basic(basicmethod) => match basicmethod {
@@ -234,6 +242,41 @@ async fn process(socket: TcpStream) -> Result<()> {
                             .write_frame(AMQPFrame::Method(
                                 channel,
                                 AMQPClass::Basic(BasicMethods::QosOk(QosOk {})),
+                            ))
+                            .await?;
+                    }
+                    BasicMethods::Consume(consume) => {
+                        connection
+                            .write_frame(AMQPFrame::Method(
+                                channel,
+                                AMQPClass::Basic(BasicMethods::ConsumeOk(ConsumeOk {
+                                    consumer_tag: consume.consumer_tag,
+                                })),
+                            ))
+                            .await?;
+                    }
+                    BasicMethods::Cancel(cancel) => {
+                        connection
+                            .write_frame(AMQPFrame::Method(
+                                channel,
+                                AMQPClass::Basic(BasicMethods::CancelOk(CancelOk {
+                                    consumer_tag: cancel.consumer_tag,
+                                })),
+                            ))
+                            .await?;
+                    }
+                    _ => todo!(),
+                },
+                AMQPClass::Exchange(exchangemethod) => match exchangemethod {
+                    ExchangeMethods::Bind(_bind) => {}
+                    ExchangeMethods::Declare(declare) => {
+                        println!("Declared exchange {}", declare.exchange);
+                        connection
+                            .write_frame(AMQPFrame::Method(
+                                channel,
+                                AMQPClass::Exchange(ExchangeMethods::DeclareOk(
+                                    ExchangeDeclareOk {},
+                                )),
                             ))
                             .await?;
                     }
