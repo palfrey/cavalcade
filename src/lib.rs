@@ -289,7 +289,7 @@ async fn process(socket: TcpStream) -> Result<()> {
                 let string_content = String::from_utf8_lossy(&content);
                 println!("Content: {}", string_content);
             }
-            AMQPFrame::Heartbeat(_) => todo!(),
+            AMQPFrame::Heartbeat(_channel) => {}
         }
     }
     println!("end process");
