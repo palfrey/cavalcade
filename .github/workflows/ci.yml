@@ -26,13 +26,12 @@ jobs:
         with:
           command: fmt
           args: -- --check
-      # - name: Clippy
-      #   uses: actions-rs/cargo@v1.0.3
-      #   env:
-      #     RUSTFLAGS: -Dwarnings
-      #   with:
-      #     command: clippy
-      #   if: ${{ matrix.features == 'default' }}
+      - name: Clippy
+        uses: actions-rs/cargo@v1.0.3
+        env:
+          RUSTFLAGS: -Dwarnings
+        with:
+          command: clippy
       - name: Build and test
         uses: actions-rs/cargo@v1.0.3
         with:
