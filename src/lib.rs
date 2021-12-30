@@ -86,7 +86,7 @@ impl Connection {
     }
 
     fn parse_frame(&self) -> Result<(&[u8], AMQPFrame)> {
-        return amq_protocol::frame::parse_frame(&self.buffer[..]).map_err(|e| e.into());
+        amq_protocol::frame::parse_frame(&self.buffer[..]).map_err(|e| e.into())
     }
 
     async fn write_frame(&mut self, frame: AMQPFrame) -> Result<()> {
@@ -150,7 +150,7 @@ async fn process(socket: TcpStream) -> Result<()> {
                         let bytes_response = start_ok.response.as_str().as_bytes();
                         let login: Vec<_> = NULL_SPLIT
                             .splitn(bytes_response, 3)
-                            .map(|b| String::from_utf8_lossy(b))
+                            .map(String::from_utf8_lossy)
                             .collect();
                         println!("Login {:?}", login);
                         if login.get(1).unwrap_or(&Cow::from("")) != "guest"
@@ -191,7 +191,7 @@ async fn process(socket: TcpStream) -> Result<()> {
                     _ => todo!(),
                 },
                 AMQPClass::Channel(chanmethod) => match chanmethod {
-                    ChanMethods::Open(open) => {
+                    ChanMethods::Open(_open) => {
                         connection
                             .write_frame(AMQPFrame::Method(
                                 channel,
@@ -199,7 +199,7 @@ async fn process(socket: TcpStream) -> Result<()> {
                             ))
                             .await?;
                     }
-                    ChanMethods::Close(close) => {
+                    ChanMethods::Close(_close) => {
                         connection
                             .write_frame(AMQPFrame::Method(
                                 channel,
@@ -224,11 +224,12 @@ async fn process(socket: TcpStream) -> Result<()> {
                             ))
                             .await?;
                     }
+                    QueueMethods::Bind(_bind) => {}
                     _ => todo!(),
                 },
                 AMQPClass::Basic(basicmethod) => match basicmethod {
-                    BasicMethods::Publish(publish) => {}
-                    BasicMethods::Qos(qos) => {
+                    BasicMethods::Publish(_publish) => {}
+                    BasicMethods::Qos(_qos) => {
                         connection
                             .write_frame(AMQPFrame::Method(
                                 channel,
@@ -240,8 +241,8 @@ async fn process(socket: TcpStream) -> Result<()> {
                 },
                 _ => todo!(),
             },
-            AMQPFrame::Header(channel, class_id, content) => {}
-            AMQPFrame::Body(channel, content) => {
+            AMQPFrame::Header(_channel, _class_id, _content) => {}
+            AMQPFrame::Body(_channel, content) => {
                 let string_content = String::from_utf8_lossy(&content);
                 println!("Content: {}", string_content);
             }
