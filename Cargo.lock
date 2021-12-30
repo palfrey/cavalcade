@@ -138,6 +138,8 @@ dependencies = [
  "anyhow",
  "bytes",
  "celery",
+ "lazy_static",
+ "regex",
  "serde",
  "tokio",
 ]

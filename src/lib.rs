@@ -1,12 +1,16 @@
+use std::borrow::Cow;
+
 use amq_protocol::{
     frame::{AMQPFrame, ProtocolVersion, WriteContext},
     protocol::{
-        connection::{AMQPMethod as ConnMethods, Start},
+        connection::{AMQPMethod as ConnMethods, Secure, Start},
         AMQPClass,
     },
-    types::{FieldTable, LongString},
+    types::{FieldTable, LongString, ShortString},
 };
 use anyhow::{bail, Result};
+use lazy_static::lazy_static;
+use regex::bytes::Regex;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
@@ -120,7 +124,7 @@ async fn process(socket: TcpStream) -> Result<()> {
                                 version_major: 0,
                                 version_minor: 9,
                                 server_properties: FieldTable::default(),
-                                mechanisms: LongString::default(),
+                                mechanisms: LongString::from("PLAIN"),
                                 locales: LongString::default(),
                             })),
                         ))
@@ -132,7 +136,39 @@ async fn process(socket: TcpStream) -> Result<()> {
                     connection.close().await?
                 }
             }
-            AMQPFrame::Method(_, _) => todo!(),
+            AMQPFrame::Method(channel, method) => match method {
+                AMQPClass::Connection(connmethod) => match connmethod {
+                    ConnMethods::StartOk(start_ok) => {
+                        if start_ok.mechanism != ShortString::from("PLAIN") {
+                            todo!();
+                        }
+                        lazy_static! {
+                            static ref NULL_SPLIT: Regex = Regex::new("\u{0}").unwrap();
+                        }
+                        let bytes_response = start_ok.response.as_str().as_bytes();
+                        let login: Vec<_> = NULL_SPLIT
+                            .splitn(bytes_response, 3)
+                            .map(|b| String::from_utf8_lossy(b))
+                            .collect();
+                        println!("Login {:?}", login);
+                        if login.get(1).unwrap_or(&Cow::from("")) != "guest"
+                            || login.get(2).unwrap_or(&Cow::from("")) != "guest"
+                        {
+                            todo!("Support non guest/guest logins");
+                        }
+                        connection
+                            .write_frame(AMQPFrame::Method(
+                                0,
+                                AMQPClass::Connection(ConnMethods::Secure(Secure {
+                                    challenge: LongString::from("PLAIN"),
+                                })),
+                            ))
+                            .await?;
+                    }
+                    _ => todo!(),
+                },
+                _ => todo!(),
+            },
             AMQPFrame::Header(_, _, _) => todo!(),
             AMQPFrame::Body(_, _) => todo!(),
             AMQPFrame::Heartbeat(_) => todo!(),
