@@ -1,0 +1,8 @@
+repos:
+- repo: https://github.com/sqlfluff/sqlfluff
+  rev: 0.9.0
+  hooks:
+    - id: sqlfluff-fix    
+      exclude: ^migrations/00000000000000_diesel_initial_setup
+    - id: sqlfluff-lint
+      exclude: ^migrations/00000000000000_diesel_initial_setup

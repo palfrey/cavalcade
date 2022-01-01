@@ -1,5 +1,12 @@
 version: "3"
 services:
+  db:
+    image: postgres:13
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: password
+
   cavalcade:
     build: .
     volumes:
