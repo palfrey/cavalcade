@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, env};
 
 use amq_protocol::{
     frame::{AMQPFrame, ProtocolVersion, WriteContext},
@@ -15,6 +15,11 @@ use amq_protocol::{
     types::{FieldTable, LongString, ShortString},
 };
 use anyhow::{bail, Result};
+use diesel::{
+    r2d2::{ConnectionManager, PooledConnection},
+    PgConnection,
+};
+use dotenv::dotenv;
 use lazy_static::lazy_static;
 use regex::bytes::Regex;
 use tokio::{
@@ -22,15 +27,24 @@ use tokio::{
     net::{TcpListener, TcpStream},
 };
 
+pub fn get_db_connection() -> ConnectionManager<PgConnection> {
+    dotenv().ok();
+
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    ConnectionManager::<PgConnection>::new(&database_url)
+}
+
 pub async fn server() -> Result<()> {
     // Bind the listener to the address
     let listener = TcpListener::bind("0.0.0.0:5672").await?;
+    let manager = get_db_connection();
+    let pool = r2d2::Pool::builder().max_size(15).build(manager).unwrap();
     println!("Listening");
 
     loop {
         // The second item contains the IP and port of the new connection.
         let (socket, _) = listener.accept().await?;
-        tokio::spawn(process(socket));
+        tokio::spawn(process(pool.get().unwrap(), socket));
     }
 }
 pub struct Connection {
@@ -110,7 +124,10 @@ impl Connection {
     }
 }
 
-async fn process(socket: TcpStream) -> Result<()> {
+async fn process(
+    conn: PooledConnection<ConnectionManager<PgConnection>>,
+    socket: TcpStream,
+) -> Result<()> {
     println!("Got socket {:?}", socket);
 
     let mut connection = Connection::new(socket);

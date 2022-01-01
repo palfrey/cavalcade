@@ -3,8 +3,6 @@ name = "cavalcade"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 amq-protocol = "6"
 serde = "1"
@@ -13,8 +11,9 @@ anyhow = "1"
 bytes = "1"
 regex = "1"
 lazy_static = "1"
-diesel = { version = "1.4", features = ["postgres"] }
+diesel = { version = "1.4", features = ["postgres", "r2d2"] }
 dotenv = "0.15.0"
+r2d2 = "0.8"
 
 [dev-dependencies]
 celery = "0.4.0-rcn.11"
