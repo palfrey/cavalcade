@@ -11,3 +11,7 @@ repos:
       rev: 0.1.0
       hooks:
           - id: yamlfmt
+    - repo: https://github.com/psf/black
+      rev: 19.3b0
+      hooks:
+          - id: black
