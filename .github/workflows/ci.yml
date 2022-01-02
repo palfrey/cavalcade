@@ -67,4 +67,4 @@ jobs:
         steps:
             - uses: actions/checkout@v2.3.4
             - uses: satackey/action-docker-layer-caching@v0.0.11
-            - run: docker-compose up --exit-code test-celery
+            - run: docker-compose up --build --exit-code test-celery
