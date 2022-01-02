@@ -18,6 +18,7 @@ use amq_protocol::{
 use anyhow::{bail, Result};
 use dotenv::dotenv;
 use lazy_static::lazy_static;
+use log::{debug, info};
 use regex::bytes::Regex;
 use sqlx::PgPool;
 use std::{borrow::Cow, env};
@@ -34,10 +35,11 @@ async fn get_db_connection() -> Result<PgPool> {
 }
 
 pub async fn server() -> Result<()> {
-    // Bind the listener to the address
-    let listener = TcpListener::bind("0.0.0.0:5672").await?;
+    info!("Booting");
     let pool = get_db_connection().await?;
-    println!("Listening");
+    info!("Database connection established");
+    let listener = TcpListener::bind("0.0.0.0:5672").await?;
+    info!("Listening");
 
     loop {
         // The second item contains the IP and port of the new connection.
@@ -72,8 +74,6 @@ impl Connection {
                 Err(_err) => {}
             }
 
-            // println!("getting more data at cursor {}", self.cursor);
-
             // Ensure the buffer has capacity
             if self.buffer.len() == self.cursor {
                 // Grow the buffer
@@ -84,7 +84,7 @@ impl Connection {
             // of bytes read
             let n = self.stream.read(&mut self.buffer[self.cursor..]).await?;
 
-            println!("Got {} bytes", n);
+            debug!("Got {} bytes", n);
             if 0 == n {
                 if self.cursor == 0 {
                     return Ok(None);
@@ -103,7 +103,7 @@ impl Connection {
     }
 
     async fn write_frame(&mut self, frame: AMQPFrame) -> Result<()> {
-        println!("Output Frame: {:?}", frame);
+        debug!("Output Frame: {:?}", frame);
         let mut write_buffer = vec![];
         write_buffer = amq_protocol::frame::gen_frame(&frame)(WriteContext {
             write: write_buffer,
@@ -153,12 +153,12 @@ async fn store_queue(conn: &PgPool, declare: &QueueDeclare) {
 }
 
 async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
-    println!("Got socket {:?}", socket);
+    debug!("Got socket {:?}", socket);
 
     let mut connection = Connection::new(socket);
 
     while let Some(frame) = connection.read_frame().await.unwrap() {
-        println!("Input Frame: {:?}", frame);
+        debug!("Input Frame: {:?}", frame);
         match frame {
             AMQPFrame::ProtocolHeader(version) => {
                 if version == ProtocolVersion::amqp_0_9_1() {
@@ -195,7 +195,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             .splitn(bytes_response, 3)
                             .map(String::from_utf8_lossy)
                             .collect();
-                        println!("Login {:?}", login);
+                        debug!("Login {:?}", login);
                         if login.get(1).unwrap_or(&Cow::from("")) != "guest"
                             || login.get(2).unwrap_or(&Cow::from("")) != "guest"
                         {
@@ -312,7 +312,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                 AMQPClass::Exchange(exchangemethod) => match exchangemethod {
                     ExchangeMethods::Bind(_bind) => {}
                     ExchangeMethods::Declare(declare) => {
-                        println!("Declared exchange {}", declare.exchange);
+                        debug!("Declared exchange {}", declare.exchange);
                         connection
                             .write_frame(AMQPFrame::Method(
                                 channel,
@@ -329,11 +329,11 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
             AMQPFrame::Header(_channel, _class_id, _content) => {}
             AMQPFrame::Body(_channel, content) => {
                 let string_content = String::from_utf8_lossy(&content);
-                println!("Content: {}", string_content);
+                info!("Content: {}", string_content);
             }
             AMQPFrame::Heartbeat(_channel) => {}
         }
     }
-    println!("end process");
+    info!("end process");
     Ok(())
 }

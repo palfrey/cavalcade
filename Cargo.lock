@@ -181,6 +181,7 @@ dependencies = [
  "celery",
  "dotenv",
  "lazy_static",
+ "log",
  "regex",
  "serde",
  "serde_json",
