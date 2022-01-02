@@ -13,7 +13,8 @@ services:
         build: .
         volumes:
             - .:/work
-        command: bash -c "diesel migration run && cargo run"
+        command: bash -c "cargo build && wait-for-db --mode postgres --connection-string postgres://postgres:password@db/cavalcade && diesel migration run
+            && cargo run"
         environment:
             DATABASE_URL: postgres://postgres:password@db/cavalcade
 
