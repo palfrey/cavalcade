@@ -11,9 +11,10 @@ anyhow = "1"
 bytes = "1"
 regex = "1"
 lazy_static = "1"
-diesel = { version = "1.4", features = ["postgres", "r2d2"] }
+diesel = { version = "1.4", features = ["postgres", "r2d2", "serde_json"] }
 dotenv = "0.15.0"
 r2d2 = "0.8"
+serde_json = "*"
 
 [dev-dependencies]
 celery = "0.4.0-rcn.11"

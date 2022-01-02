@@ -150,6 +150,7 @@ dependencies = [
  "r2d2",
  "regex",
  "serde",
+ "serde_json",
  "simplelog",
  "tokio",
 ]
@@ -297,6 +298,7 @@ dependencies = [
  "diesel_derives",
  "pq-sys",
  "r2d2",
+ "serde_json",
 ]
 
 [[package]]
