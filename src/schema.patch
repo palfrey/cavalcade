@@ -2,10 +2,7 @@ diff --git a/src/schema.rs b/src/schema.rs
 index af79bf5..4dfba0a 100644
 --- a/src/schema.rs
 +++ b/src/schema.rs
-@@ -1,25 +1,28 @@
- table! {
-     bind (id) {
-         id -> Int4,
+@@ -4,7 +4,8 @@
          queue_id -> Nullable<Int4>,
          exchange_id -> Nullable<Int4>,
          routing_key -> Nullable<Varchar>,
@@ -15,7 +12,7 @@ index af79bf5..4dfba0a 100644
          arguments -> Nullable<Jsonb>,
      }
  }
- 
+@@ -12,11 +13,13 @@
  table! {
      exchange (id) {
          id -> Int4,
@@ -31,13 +28,7 @@ index af79bf5..4dfba0a 100644
          arguments -> Nullable<Jsonb>,
      }
  }
- 
- table! {
-     message (id) {
-@@ -33,18 +36,21 @@ table! {
-     }
- }
- 
+@@ -36,12 +39,15 @@
  table! {
      queue (id) {
          id -> Int4,
@@ -56,6 +47,14 @@ index af79bf5..4dfba0a 100644
          arguments -> Nullable<Jsonb>,
      }
  }
- 
- joinable!(bind -> exchange (exchange_id));
+@@ -50,9 +56,4 @@
  joinable!(bind -> queue (queue_id));
+ joinable!(message -> queue (queue_id));
+ 
+-allow_tables_to_appear_in_same_query!(
+-    bind,
+-    exchange,
+-    message,
+-    queue,
+-);
++allow_tables_to_appear_in_same_query!(bind, exchange, message, queue);

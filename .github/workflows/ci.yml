@@ -11,6 +11,21 @@ name: Continuous integration
 
 jobs:
     test:
+        services:
+            postgres:
+                image: postgres:13
+                env:
+                    POSTGRES_PASSWORD: password
+                    POSTGRES_DB: cavalcade
+                # Set health checks to wait until postgres has started
+                options: >-
+                    --health-cmd pg_isready
+                    --health-interval 10s
+                    --health-timeout 5s
+                    --health-retries 5
+                ports:
+                    - 5432:5432
+
         name: Test suite
         runs-on: ubuntu-latest
         steps:
@@ -22,6 +37,12 @@ jobs:
                   override: true
                   components: clippy, rustfmt
             - uses: Swatinem/rust-cache@v1
+              with:
+                  cache-on-failure: true
+            - name: Install diesel-cli
+              run: cargo install diesel_cli --no-default-features --features postgres
+            - name: Run migrations
+              run: diesel migration run
             - name: Check formatting
               uses: actions-rs/cargo@v1.0.3
               with:
@@ -35,6 +56,8 @@ jobs:
                   command: clippy
             - name: Build and test
               uses: actions-rs/cargo@v1.0.3
+              env:
+                  DATABASE_URL: postgres://postgres:password@localhost/cavalcade
               with:
                   command: test
 
@@ -44,4 +67,4 @@ jobs:
         steps:
             - uses: actions/checkout@v2.3.4
             - uses: satackey/action-docker-layer-caching@v0.0.11
-            - run: docker-compose up --exit-code test-celery
+            - run: docker-compose up --build --exit-code test-celery

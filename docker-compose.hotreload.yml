@@ -1,0 +1,10 @@
+---
+version: '3'
+services:
+    cavalcade:
+        volumes:
+            - .:/work
+
+    test-celery:
+        volumes:
+            - ./tests:/work

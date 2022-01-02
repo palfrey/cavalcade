@@ -1,5 +1,10 @@
-use std::borrow::Cow;
+#[macro_use]
+extern crate diesel;
 
+mod models;
+mod schema;
+
+use crate::{models::NewQueue, models::Queue, schema::queue};
 use amq_protocol::{
     frame::{AMQPFrame, ProtocolVersion, WriteContext},
     protocol::{
@@ -9,28 +14,49 @@ use amq_protocol::{
             AMQPMethod as ConnMethods, CloseOk as ConnCloseOk, OpenOk as ConnOpenOk, Start, Tune,
         },
         exchange::{AMQPMethod as ExchangeMethods, DeclareOk as ExchangeDeclareOk},
-        queue::{AMQPMethod as QueueMethods, BindOk as QueueBindOk, DeclareOk as QueueDeclareOk},
+        queue::{
+            AMQPMethod as QueueMethods, BindOk as QueueBindOk, Declare as QueueDeclare,
+            DeclareOk as QueueDeclareOk,
+        },
         AMQPClass,
     },
     types::{FieldTable, LongString, ShortString},
 };
 use anyhow::{bail, Result};
+use diesel::{
+    prelude::*,
+    r2d2::{ConnectionManager, PooledConnection},
+    PgConnection,
+};
+use dotenv::dotenv;
 use lazy_static::lazy_static;
 use regex::bytes::Regex;
+use std::{borrow::Cow, env};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
 };
 
+type Conn = PooledConnection<ConnectionManager<PgConnection>>;
+
+pub fn get_db_connection() -> ConnectionManager<PgConnection> {
+    dotenv().ok();
+
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    ConnectionManager::<PgConnection>::new(&database_url)
+}
+
 pub async fn server() -> Result<()> {
     // Bind the listener to the address
     let listener = TcpListener::bind("0.0.0.0:5672").await?;
+    let manager = get_db_connection();
+    let pool = r2d2::Pool::builder().max_size(15).build(manager).unwrap();
     println!("Listening");
 
     loop {
         // The second item contains the IP and port of the new connection.
         let (socket, _) = listener.accept().await?;
-        tokio::spawn(process(socket));
+        tokio::spawn(process(pool.get().unwrap(), socket));
     }
 }
 pub struct Connection {
@@ -110,7 +136,47 @@ impl Connection {
     }
 }
 
-async fn process(socket: TcpStream) -> Result<()> {
+fn fieldtable_to_json(table: &FieldTable) -> serde_json::Value {
+    serde_json::to_value(table.inner()).unwrap()
+}
+
+fn store_queue(conn: &Conn, declare: &QueueDeclare) {
+    let queue_name = declare.queue.to_string();
+    let existing_queues = queue::table
+        .filter(queue::name.eq(&queue_name))
+        .select(queue::all_columns)
+        .load::<Queue>(conn)
+        .unwrap();
+    if !existing_queues.is_empty() {
+        assert_eq!(existing_queues.len(), 1);
+        diesel::update(queue::table.filter(queue::id.eq(existing_queues.first().unwrap().id)))
+            .set((
+                queue::passive.eq(Some(declare.passive)),
+                queue::durable.eq(Some(declare.durable)),
+                queue::exclusive.eq(Some(declare.exclusive)),
+                queue::auto_delete.eq(Some(declare.auto_delete)),
+                queue::nowait.eq(Some(declare.nowait)),
+                queue::arguments.eq(Some(fieldtable_to_json(&declare.arguments))),
+            ))
+            .execute(conn)
+            .unwrap();
+    } else {
+        diesel::insert_into(queue::table)
+            .values(&NewQueue {
+                name: Some(queue_name),
+                passive: Some(declare.passive),
+                durable: Some(declare.durable),
+                exclusive: Some(declare.exclusive),
+                auto_delete: Some(declare.auto_delete),
+                nowait: Some(declare.nowait),
+                arguments: Some(fieldtable_to_json(&declare.arguments)),
+            })
+            .execute(conn)
+            .unwrap();
+    }
+}
+
+async fn process(conn: Conn, socket: TcpStream) -> Result<()> {
     println!("Got socket {:?}", socket);
 
     let mut connection = Connection::new(socket);
@@ -213,7 +279,7 @@ async fn process(socket: TcpStream) -> Result<()> {
                 },
                 AMQPClass::Queue(queuemethod) => match queuemethod {
                     QueueMethods::Declare(declare) => {
-                        println!("Declared queue {}", declare.queue);
+                        store_queue(&conn, &declare);
                         connection
                             .write_frame(AMQPFrame::Method(
                                 channel,

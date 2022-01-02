@@ -56,9 +56,4 @@ joinable!(bind -> exchange (exchange_id));
 joinable!(bind -> queue (queue_id));
 joinable!(message -> queue (queue_id));
 
-allow_tables_to_appear_in_same_query!(
-    bind,
-    exchange,
-    message,
-    queue,
-);
+allow_tables_to_appear_in_same_query!(bind, exchange, message, queue);
