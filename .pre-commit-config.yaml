@@ -15,8 +15,7 @@ repos:
       rev: 19.3b0
       hooks:
           - id: black
-    - repo: https://github.com/pappasam/toml-sort
-      rev: v0.19.0
+    - repo: https://github.com/DevinR528/cargo-sort
+      rev: v1.0.7
       hooks:
-          - id: toml-sort
-            args: [--in-place, --all]
+          - id: cargo-sort

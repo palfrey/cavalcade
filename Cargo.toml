@@ -1,3 +1,8 @@
+[package]
+edition = "2021"
+name = "cavalcade"
+version = "0.1.0"
+
 [dependencies]
 amq-protocol = "6"
 anyhow = "1"
@@ -7,13 +12,8 @@ dotenv = "0.15.0"
 lazy_static = "1"
 regex = "1"
 serde = "1"
-tokio = {version="1", features=["net", "io-util", "rt", "macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["net", "io-util", "rt", "macros", "rt-multi-thread"] }
 
 [dev-dependencies]
 celery = "0.4.0-rcn.11"
 simplelog = "*"
-
-[package]
-edition = "2021"
-name = "cavalcade"
-version = "0.1.0"
