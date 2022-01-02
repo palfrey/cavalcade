@@ -11,8 +11,6 @@ services:
 
     cavalcade:
         build: .
-        volumes:
-            - .:/work
         command: bash -c "cargo build && wait-for-db --mode postgres --connection-string postgres://postgres:password@db/cavalcade && diesel migration run
             && cargo run"
         environment:
@@ -25,5 +23,3 @@ services:
         environment:
             AMQP_HOST: cavalcade
         command: wait-for-it --host=cavalcade --port=5672 --timeout=0 --strict -- python test_tasks.py worker --loglevel=DEBUG
-        volumes:
-            - ./tests:/work
