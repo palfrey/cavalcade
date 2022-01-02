@@ -15,3 +15,8 @@ repos:
       rev: 19.3b0
       hooks:
           - id: black
+    - repo: https://github.com/pappasam/toml-sort
+      rev: v0.19.0
+      hooks:
+          - id: toml-sort
+            args: [--in-place, --all]
