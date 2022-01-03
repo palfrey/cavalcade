@@ -39,7 +39,7 @@ jobs:
             - uses: Swatinem/rust-cache@v1
               with:
                   cache-on-failure: true
-            - name: Install diesel-cli
+            - name: Install sqlx-cli
               run: cargo install sqlx-cli --no-default-features --features postgres,rustls
             - name: Run migrations
               run: sqlx migrate run
