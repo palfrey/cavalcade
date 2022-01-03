@@ -1,10 +1,3 @@
-#[macro_use]
-extern crate diesel;
-
-mod models;
-mod schema;
-
-use crate::{models::NewQueue, models::Queue, schema::queue};
 use amq_protocol::{
     frame::{AMQPFrame, ProtocolVersion, WriteContext},
     protocol::{
@@ -23,34 +16,27 @@ use amq_protocol::{
     types::{FieldTable, LongString, ShortString},
 };
 use anyhow::{bail, Result};
-use diesel::{
-    prelude::*,
-    r2d2::{ConnectionManager, PooledConnection},
-    PgConnection,
-};
 use dotenv::dotenv;
 use lazy_static::lazy_static;
 use log::{debug, info};
 use regex::bytes::Regex;
+use sqlx::PgPool;
 use std::{borrow::Cow, env};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
 };
 
-type Conn = PooledConnection<ConnectionManager<PgConnection>>;
-
-pub fn get_db_connection() -> ConnectionManager<PgConnection> {
+async fn get_db_connection() -> Result<PgPool> {
     dotenv().ok();
 
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    ConnectionManager::<PgConnection>::new(&database_url)
+    return PgPool::connect(&database_url).await.map_err(|e| e.into());
 }
 
 pub async fn server() -> Result<()> {
     info!("Booting");
-    let manager = get_db_connection();
-    let pool = r2d2::Pool::builder().max_size(15).build(manager).unwrap();
+    let pool = get_db_connection().await?;
     info!("Database connection established");
     let listener = TcpListener::bind("0.0.0.0:5672").await?;
     info!("Listening");
@@ -58,7 +44,7 @@ pub async fn server() -> Result<()> {
     loop {
         // The second item contains the IP and port of the new connection.
         let (socket, _) = listener.accept().await?;
-        tokio::spawn(process(pool.get().unwrap(), socket));
+        tokio::spawn(process(pool.clone(), socket));
     }
 }
 pub struct Connection {
@@ -140,43 +126,33 @@ fn fieldtable_to_json(table: &FieldTable) -> serde_json::Value {
     serde_json::to_value(table.inner()).unwrap()
 }
 
-fn store_queue(conn: &Conn, declare: &QueueDeclare) {
+async fn store_queue(conn: &PgPool, declare: &QueueDeclare) {
     let queue_name = declare.queue.to_string();
-    let existing_queues = queue::table
-        .filter(queue::name.eq(&queue_name))
-        .select(queue::all_columns)
-        .load::<Queue>(conn)
-        .unwrap();
-    if !existing_queues.is_empty() {
-        assert_eq!(existing_queues.len(), 1);
-        diesel::update(queue::table.filter(queue::id.eq(existing_queues.first().unwrap().id)))
-            .set((
-                queue::passive.eq(Some(declare.passive)),
-                queue::durable.eq(Some(declare.durable)),
-                queue::exclusive.eq(Some(declare.exclusive)),
-                queue::auto_delete.eq(Some(declare.auto_delete)),
-                queue::nowait.eq(Some(declare.nowait)),
-                queue::arguments.eq(Some(fieldtable_to_json(&declare.arguments))),
-            ))
-            .execute(conn)
-            .unwrap();
+    let existing_queues = sqlx::query!("SELECT id FROM queue WHERE _name = $1", &queue_name)
+        .fetch_one(conn)
+        .await;
+    let id = existing_queues.ok().map(|r| r.id);
+    if id.is_some() {
+        sqlx::query!(
+            "
+            UPDATE queue SET passive = $1, durable = $2, _exclusive = $3, auto_delete = $4, _nowait = $5, arguments = $6
+            WHERE id = $7",
+            declare.passive,
+            declare.durable,
+            declare.exclusive, declare.auto_delete, declare.nowait, fieldtable_to_json(&declare.arguments), id.unwrap()
+        )
+        .execute(conn)
+        .await.unwrap();
     } else {
-        diesel::insert_into(queue::table)
-            .values(&NewQueue {
-                name: Some(queue_name),
-                passive: Some(declare.passive),
-                durable: Some(declare.durable),
-                exclusive: Some(declare.exclusive),
-                auto_delete: Some(declare.auto_delete),
-                nowait: Some(declare.nowait),
-                arguments: Some(fieldtable_to_json(&declare.arguments)),
-            })
-            .execute(conn)
-            .unwrap();
+        sqlx::query!("INSERT INTO queue (_name, passive, durable, _exclusive, auto_delete, _nowait, arguments) VALUES($1, $2, $3, $4, $5, $6, $7)",
+        queue_name,
+        declare.passive,
+        declare.durable,
+        declare.exclusive, declare.auto_delete, declare.nowait, fieldtable_to_json(&declare.arguments)).execute(conn).await.unwrap();
     }
 }
 
-async fn process(conn: Conn, socket: TcpStream) -> Result<()> {
+async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
     debug!("Got socket {:?}", socket);
 
     let mut connection = Connection::new(socket);
@@ -279,7 +255,7 @@ async fn process(conn: Conn, socket: TcpStream) -> Result<()> {
                 },
                 AMQPClass::Queue(queuemethod) => match queuemethod {
                     QueueMethods::Declare(declare) => {
-                        store_queue(&conn, &declare);
+                        store_queue(&conn, &declare).await;
                         connection
                             .write_frame(AMQPFrame::Method(
                                 channel,

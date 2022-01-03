@@ -7,15 +7,14 @@ version = "0.1.0"
 amq-protocol = "6"
 anyhow = "1"
 bytes = "1"
-diesel = { version = "1.4", features = ["postgres", "r2d2", "serde_json"] }
 dotenv = "0.15.0"
 lazy_static = "1"
 log = "0.4"
-r2d2 = "0.8"
 regex = "1"
 serde = "1"
 serde_json = "*"
 simplelog = "0.11"
+sqlx = { version = "0.5", features = ["postgres", "runtime-tokio-rustls", "json", "offline"] }
 tokio = { version = "1", features = ["net", "io-util", "rt", "macros", "rt-multi-thread"] }
 
 [dev-dependencies]

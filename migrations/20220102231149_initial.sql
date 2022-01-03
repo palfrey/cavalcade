@@ -6,7 +6,8 @@ CREATE TABLE queue (
     _exclusive BOOLEAN,
     auto_delete BOOLEAN,
     _nowait BOOLEAN,
-    arguments JSONB
+    arguments JSONB,
+    UNIQUE(_name)
 );
 
 CREATE TABLE message (
@@ -27,7 +28,8 @@ CREATE TABLE exchange (
     durable BOOLEAN,
     auto_delete BOOLEAN,
     _nowait BOOLEAN,
-    arguments JSONB
+    arguments JSONB,
+    UNIQUE(_name)
 );
 
 CREATE TABLE bind (
