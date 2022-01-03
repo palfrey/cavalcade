@@ -1,0 +1,15 @@
+---
+version: '3'
+services:
+    crdb:
+        image: cockroachdb/cockroach:v21.2.3
+        ports:
+            - 26257:26257
+            - 8080:8080
+        command: 'start-single-node --insecure --log="sinks: {stderr: {channels: [ALL]}}"'
+
+    cavalcade:
+        command: bash -c "cargo build && wait-for-db --mode postgres --connection-string postgresql://root@crdb:26257/defaultdb?sslmode=disable && sqlx
+            migrate run && cargo run"
+        environment:
+            DATABASE_URL: postgresql://root@crdb:26257/defaultdb?sslmode=disable

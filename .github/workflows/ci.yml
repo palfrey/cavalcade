@@ -63,10 +63,21 @@ jobs:
               with:
                   command: test
 
-    integration-test:
-        name: Integration Tests
+    postgres-integration-test:
+        name: Postgres Integration Test
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v2.3.4
             - uses: satackey/action-docker-layer-caching@v0.0.11
             - run: docker-compose up --build --exit-code test-celery
+
+    crdb-integration-test:
+        name: Cockroach Integration Test
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v2.3.4
+            - uses: satackey/action-docker-layer-caching@v0.0.11
+            - run: docker-compose up --build --exit-code test-celery
+              env:
+                  COMPOSE_FILE: docker-compose.yml:docker-compose.cockroach.yml
+
