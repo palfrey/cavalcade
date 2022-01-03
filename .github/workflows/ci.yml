@@ -40,9 +40,11 @@ jobs:
               with:
                   cache-on-failure: true
             - name: Install diesel-cli
-              run: cargo install sqlx-cli --no-default-features --features postgres,sqlx/runtime-tokio-native-tls
+              run: cargo install sqlx-cli --no-default-features --features postgres,rustls
             - name: Run migrations
               run: sqlx migrate run
+            - name: Check sqlx prepare
+              run: cargo sqlx prepare --check -- --lib
             - name: Check formatting
               uses: actions-rs/cargo@v1.0.3
               with:
