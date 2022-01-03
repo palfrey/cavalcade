@@ -6,7 +6,10 @@ use amq_protocol::{
         connection::{
             AMQPMethod as ConnMethods, CloseOk as ConnCloseOk, OpenOk as ConnOpenOk, Start, Tune,
         },
-        exchange::{AMQPMethod as ExchangeMethods, DeclareOk as ExchangeDeclareOk},
+        exchange::{
+            AMQPMethod as ExchangeMethods, Declare as ExchangeDeclare,
+            DeclareOk as ExchangeDeclareOk,
+        },
         queue::{
             AMQPMethod as QueueMethods, BindOk as QueueBindOk, Declare as QueueDeclare,
             DeclareOk as QueueDeclareOk,
@@ -152,6 +155,33 @@ async fn store_queue(conn: &PgPool, declare: &QueueDeclare) {
     }
 }
 
+async fn store_exchange(conn: &PgPool, declare: &ExchangeDeclare) {
+    let exchange_name = declare.exchange.to_string();
+    let existing_exchanges =
+        sqlx::query!("SELECT id FROM exchange WHERE _name = $1", &exchange_name)
+            .fetch_one(conn)
+            .await;
+    let id = existing_exchanges.ok().map(|r| r.id);
+    if id.is_some() {
+        sqlx::query!(
+            "
+            UPDATE exchange SET passive = $1, durable = $2, auto_delete = $3, _nowait = $4, arguments = $5
+            WHERE id = $6",
+            declare.passive,
+            declare.durable,
+            declare.auto_delete, declare.nowait, fieldtable_to_json(&declare.arguments), id.unwrap()
+        )
+        .execute(conn)
+        .await.unwrap();
+    } else {
+        sqlx::query!("INSERT INTO exchange (_name, passive, durable, auto_delete, _nowait, arguments) VALUES($1, $2, $3, $4, $5, $6)",
+        exchange_name,
+        declare.passive,
+        declare.durable,
+        declare.auto_delete, declare.nowait, fieldtable_to_json(&declare.arguments)).execute(conn).await.unwrap();
+    }
+}
+
 async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
     debug!("Got socket {:?}", socket);
 
@@ -249,7 +279,6 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                                 AMQPClass::Channel(ChanMethods::CloseOk(ChanCloseOk {})),
                             ))
                             .await?;
-                        // connection.close().await?
                     }
                     _ => todo!(),
                 },
@@ -313,6 +342,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                     ExchangeMethods::Bind(_bind) => {}
                     ExchangeMethods::Declare(declare) => {
                         debug!("Declared exchange {}", declare.exchange);
+                        store_exchange(&conn, &declare).await;
                         connection
                             .write_frame(AMQPFrame::Method(
                                 channel,
