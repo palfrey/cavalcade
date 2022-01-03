@@ -19,6 +19,7 @@ use amq_protocol::{
     types::{FieldTable, LongString, ShortString},
 };
 use anyhow::{bail, Result};
+use chrono::Utc;
 use dotenv::dotenv;
 use lazy_static::lazy_static;
 use log::{debug, info};
@@ -182,10 +183,45 @@ async fn store_exchange(conn: &PgPool, declare: &ExchangeDeclare) {
     }
 }
 
+#[derive(PartialEq, Debug)]
+enum MessageType {
+    Nothing,
+    Publish,
+}
+
+struct Message {
+    kind: MessageType,
+    exchange: Option<String>,
+    routing_key: Option<String>,
+    body_size: Option<u64>,
+    headers: Option<serde_json::Value>,
+}
+
+async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
+    assert_eq!(message.exchange.as_ref().unwrap(), ""); // Don't deal with bindings yet
+    let queue = sqlx::query!(
+        "SELECT id FROM queue WHERE _name = $1",
+        &message.routing_key.as_ref().unwrap()
+    )
+    .fetch_one(conn)
+    .await;
+    sqlx::query!(
+        "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by) VALUES($1, $2, $3, $4, NULL, NULL)",
+    message.headers, content, queue.unwrap().id, Utc::now().naive_utc()).execute(conn).await.unwrap();
+}
+
 async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
     debug!("Got socket {:?}", socket);
 
     let mut connection = Connection::new(socket);
+
+    let mut current_message = Message {
+        kind: MessageType::Nothing,
+        exchange: None,
+        routing_key: None,
+        body_size: None,
+        headers: None,
+    };
 
     while let Some(frame) = connection.read_frame().await.unwrap() {
         debug!("Input Frame: {:?}", frame);
@@ -307,7 +343,12 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                     _ => todo!(),
                 },
                 AMQPClass::Basic(basicmethod) => match basicmethod {
-                    BasicMethods::Publish(_publish) => {}
+                    BasicMethods::Publish(publish) => {
+                        assert_eq!(current_message.kind, MessageType::Nothing);
+                        current_message.kind = MessageType::Publish;
+                        current_message.exchange = Some(publish.exchange.to_string());
+                        current_message.routing_key = Some(publish.routing_key.to_string());
+                    }
                     BasicMethods::Qos(_qos) => {
                         connection
                             .write_frame(AMQPFrame::Method(
@@ -356,10 +397,19 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                 },
                 _ => todo!(),
             },
-            AMQPFrame::Header(_channel, _class_id, _content) => {}
+            AMQPFrame::Header(_channel, _class_id, content) => {
+                assert_ne!(current_message.kind, MessageType::Nothing);
+                let headers = content.properties.headers().as_ref().unwrap();
+                current_message.headers = Some(fieldtable_to_json(&headers));
+                current_message.body_size = Some(content.body_size);
+            }
             AMQPFrame::Body(_channel, content) => {
                 let string_content = String::from_utf8_lossy(&content);
                 info!("Content: {}", string_content);
+                assert_eq!(current_message.kind, MessageType::Publish);
+                assert_eq!(current_message.body_size.unwrap(), content.len() as u64);
+                store_message(&conn, &current_message, content).await;
+                current_message.kind = MessageType::Nothing;
             }
             AMQPFrame::Heartbeat(_channel) => {}
         }
