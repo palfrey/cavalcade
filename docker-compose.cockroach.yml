@@ -13,3 +13,8 @@ services:
             migrate run && cargo run"
         environment:
             DATABASE_URL: postgresql://root@crdb:26257/defaultdb?sslmode=disable
+
+    # Effectively just remove it
+    db:
+        image: bash
+        command: sleep infinite
