@@ -6,4 +6,5 @@ COPY Cargo.lock Cargo.toml /work/
 COPY src/ /work/src/
 RUN cargo build
 COPY migrations/ /work/migrations/
+COPY sqlx-data.json /work/
 CMD ./target/debug/cavalcade
