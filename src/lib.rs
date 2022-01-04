@@ -28,7 +28,11 @@ use sqlx::PgPool;
 use std::{borrow::Cow, env};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpStream},
+    net::{
+        tcp::{OwnedReadHalf, OwnedWriteHalf},
+        TcpListener, TcpStream,
+    },
+    sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
 };
 
 async fn get_db_connection() -> Result<PgPool> {
@@ -51,15 +55,15 @@ pub async fn server() -> Result<()> {
         tokio::spawn(process(pool.clone(), socket));
     }
 }
-pub struct Connection {
-    stream: TcpStream,
+pub struct ConnectionReader {
+    stream: OwnedReadHalf,
     buffer: Vec<u8>,
     cursor: usize,
 }
 
-impl Connection {
-    pub fn new(stream: TcpStream) -> Connection {
-        Connection {
+impl ConnectionReader {
+    pub fn new(stream: OwnedReadHalf) -> Self {
+        Self {
             stream,
             buffer: vec![0; 4096],
             cursor: 0,
@@ -104,6 +108,28 @@ impl Connection {
 
     fn parse_frame(&self) -> Result<(&[u8], AMQPFrame)> {
         amq_protocol::frame::parse_frame(&self.buffer[..]).map_err(|e| e.into())
+    }
+}
+
+pub struct ConnectionWriter {
+    stream: OwnedWriteHalf,
+    receiver: UnboundedReceiver<AMQPFrame>,
+}
+
+impl ConnectionWriter {
+    pub fn new(stream: OwnedWriteHalf, receiver: UnboundedReceiver<AMQPFrame>) -> Self {
+        Self { stream, receiver }
+    }
+
+    async fn run(&mut self) {
+        loop {
+            let msg = self.receiver.recv().await;
+            if let Some(frame) = msg {
+                self.write_frame(frame);
+            } else {
+                break;
+            }
+        }
     }
 
     async fn write_frame(&mut self, frame: AMQPFrame) -> Result<()> {
@@ -303,7 +329,13 @@ async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
 async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
     debug!("Got socket {:?}", socket);
 
-    let mut connection = Connection::new(socket);
+    let (read_half, write_half) = socket.into_split();
+
+    let mut connection = ConnectionReader::new(read_half);
+    let (sender, receiver) = mpsc::unbounded_channel::<AMQPFrame>();
+    let writer = ConnectionWriter::new(write_half, receiver);
+
+    tokio::spawn(writer.run());
 
     let mut current_message = Message {
         kind: MessageType::Nothing,
@@ -318,18 +350,16 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
         match frame {
             AMQPFrame::ProtocolHeader(version) => {
                 if version == ProtocolVersion::amqp_0_9_1() {
-                    connection
-                        .write_frame(AMQPFrame::Method(
-                            0,
-                            AMQPClass::Connection(ConnMethods::Start(Start {
-                                version_major: 0,
-                                version_minor: 1,
-                                server_properties: FieldTable::default(),
-                                mechanisms: LongString::from("PLAIN"),
-                                locales: LongString::from("en_US"),
-                            })),
-                        ))
-                        .await?;
+                    sender.send(AMQPFrame::Method(
+                        0,
+                        AMQPClass::Connection(ConnMethods::Start(Start {
+                            version_major: 0,
+                            version_minor: 1,
+                            server_properties: FieldTable::default(),
+                            mechanisms: LongString::from("PLAIN"),
+                            locales: LongString::from("en_US"),
+                        })),
+                    ))?;
                 } else {
                     connection
                         .write_frame(AMQPFrame::ProtocolHeader(ProtocolVersion::amqp_0_9_1()))
@@ -449,6 +479,12 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             .await?;
                     }
                     BasicMethods::Consume(consume) => {
+                        tokio::spawn(delivery(
+                            conn.clone(),
+                            connection.clone(),
+                            channel,
+                            consume.queue.to_string(),
+                        ));
                         connection
                             .write_frame(AMQPFrame::Method(
                                 channel,
@@ -507,4 +543,13 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
     }
     info!("end process");
     Ok(())
+}
+
+async fn delivery(
+    conn: PgPool,
+    sender: UnboundedSender<AMQPFrame>,
+    channel: u16,
+    to_string: String,
+) {
+    todo!()
 }
