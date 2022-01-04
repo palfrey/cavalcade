@@ -1,5 +1,66 @@
 {
   "db": "PostgreSQL",
+  "338326815b0ff37bda1159cb253334a5f7fa054bfbf3f744e2942ee362194049": {
+    "query": "SELECT id FROM exchange WHERE _name = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
+  "4e642bf484306848f4be88c77337d31617b75fa9d2779cbadb6ff6ab28eaf6a4": {
+    "query": "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by) VALUES($1, $2, $3, $4, NULL, NULL)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Jsonb",
+          "Bytea",
+          "Int4",
+          "Timestamp"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "62c76ddd7c04b7249394d5020ad4c75265bf8053acacc9bd78c3ddd9b80bf360": {
+    "query": "SELECT id, _type FROM exchange WHERE _name = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "_type",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
   "62f00c31fc32a41134d2c8733db528f5043be40ac2768d8d087ffc13d0537e9a": {
     "query": "\n            UPDATE queue SET passive = $1, durable = $2, _exclusive = $3, auto_delete = $4, _nowait = $5, arguments = $6\n            WHERE id = $7",
     "describe": {
@@ -34,6 +95,125 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "76ddd94c7b37a72b7ea8f9fb85ca979c39a772b8c5aa1f8d42d0a5fff2ff418c": {
+    "query": "INSERT INTO exchange (_name, _type, passive, durable, auto_delete, _nowait, arguments) VALUES($1, $2, $3, $4, $5, $6, $7)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Varchar",
+          "Bool",
+          "Bool",
+          "Bool",
+          "Bool",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "9d0930e105442800649bc4f8e354115a5b0b2f87ceed504085ba4e9a4837f823": {
+    "query": "\n            UPDATE exchange SET passive = $1, durable = $2, auto_delete = $3, _nowait = $4, arguments = $5\n            WHERE id = $6",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bool",
+          "Bool",
+          "Bool",
+          "Bool",
+          "Jsonb",
+          "Int4"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "b5612cc08c4239e22074df9b4ef08be64b15b8fe06005f8ac339e225216247fb": {
+    "query": "SELECT id, queue_id, routing_key FROM bind WHERE exchange_id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "queue_id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 2,
+          "name": "routing_key",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "c941debae0c691d40cb327da176caa7243e06b3811309dbc5c6c7e7d8ebfdbba": {
+    "query": "INSERT INTO bind (queue_id, exchange_id, routing_key, _nowait, arguments) VALUES($1, $2, $3, $4, $5)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Int4",
+          "Varchar",
+          "Bool",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "c9dacc8452436daeaf9f2faaddfa4496512cba917bbc3597e8151d589f7b9d00": {
+    "query": "\n            UPDATE bind SET _nowait = $1, arguments = $2\n            WHERE id = $3",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bool",
+          "Jsonb",
+          "Int4"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "df1f3974b92d8b44658b2ad090ac8c954b13fb271afa101568c05482134ea4bf": {
+    "query": "SELECT id FROM bind WHERE \n            queue_id IN (SELECT id FROM queue where _name = $1) AND\n            exchange_id IN (SELECT id from exchange where _name = $2) AND\n            routing_key = $3",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false
+      ]
     }
   },
   "f814486e9aa19d0e8f857b88677e53d5e364270aae5f0dfbbf7c8f319e65901a": {

@@ -11,7 +11,7 @@ use amq_protocol::{
             DeclareOk as ExchangeDeclareOk,
         },
         queue::{
-            AMQPMethod as QueueMethods, BindOk as QueueBindOk, Declare as QueueDeclare,
+            AMQPMethod as QueueMethods, Bind, BindOk as QueueBindOk, Declare as QueueDeclare,
             DeclareOk as QueueDeclareOk,
         },
         AMQPClass,
@@ -23,7 +23,7 @@ use chrono::Utc;
 use dotenv::dotenv;
 use lazy_static::lazy_static;
 use log::{debug, info};
-use regex::bytes::Regex;
+use regex::{bytes::Regex as BytesRegex, Regex};
 use sqlx::PgPool;
 use std::{borrow::Cow, env};
 use tokio::{
@@ -175,11 +175,56 @@ async fn store_exchange(conn: &PgPool, declare: &ExchangeDeclare) {
         .execute(conn)
         .await.unwrap();
     } else {
-        sqlx::query!("INSERT INTO exchange (_name, passive, durable, auto_delete, _nowait, arguments) VALUES($1, $2, $3, $4, $5, $6)",
+        sqlx::query!("INSERT INTO exchange (_name, _type, passive, durable, auto_delete, _nowait, arguments) VALUES($1, $2, $3, $4, $5, $6, $7)",
         exchange_name,
+        declare.kind.to_string(),
         declare.passive,
         declare.durable,
         declare.auto_delete, declare.nowait, fieldtable_to_json(&declare.arguments)).execute(conn).await.unwrap();
+    }
+}
+
+async fn store_bind(conn: &PgPool, bind: &Bind) {
+    let exchange_name = bind.exchange.to_string();
+    let queue_name = bind.queue.to_string();
+    let routing_key = bind.routing_key.to_string();
+    let existing_binds = sqlx::query!(
+        "SELECT id FROM bind WHERE 
+            queue_id IN (SELECT id FROM queue where _name = $1) AND
+            exchange_id IN (SELECT id from exchange where _name = $2) AND
+            routing_key = $3",
+        &queue_name,
+        &exchange_name,
+        &routing_key
+    )
+    .fetch_one(conn)
+    .await;
+    let id = existing_binds.ok().map(|r| r.id);
+    if id.is_some() {
+        sqlx::query!(
+            "
+            UPDATE bind SET _nowait = $1, arguments = $2
+            WHERE id = $3",
+            bind.nowait,
+            fieldtable_to_json(&bind.arguments),
+            id.unwrap()
+        )
+        .execute(conn)
+        .await
+        .unwrap();
+    } else {
+        let queue = sqlx::query!("SELECT id FROM queue WHERE _name = $1", queue_name)
+            .fetch_one(conn)
+            .await;
+        let exchange = sqlx::query!("SELECT id FROM exchange WHERE _name = $1", exchange_name)
+            .fetch_one(conn)
+            .await;
+        sqlx::query!("INSERT INTO bind (queue_id, exchange_id, routing_key, _nowait, arguments) VALUES($1, $2, $3, $4, $5)",
+            queue.unwrap().id,
+            exchange.unwrap().id,
+            routing_key,
+            bind.nowait,
+            fieldtable_to_json(&bind.arguments)).execute(conn).await.unwrap();
     }
 }
 
@@ -189,6 +234,7 @@ enum MessageType {
     Publish,
 }
 
+#[derive(Debug)]
 struct Message {
     kind: MessageType,
     exchange: Option<String>,
@@ -197,17 +243,61 @@ struct Message {
     headers: Option<serde_json::Value>,
 }
 
-async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
-    assert_eq!(message.exchange.as_ref().unwrap(), ""); // Don't deal with bindings yet
-    let queue = sqlx::query!(
-        "SELECT id FROM queue WHERE _name = $1",
-        &message.routing_key.as_ref().unwrap()
-    )
-    .fetch_one(conn)
-    .await;
+async fn insert_into_named_queue(
+    conn: &PgPool,
+    queue_name: &String,
+    message: &Message,
+    content: Vec<u8>,
+) {
+    let queue = sqlx::query!("SELECT id FROM queue WHERE _name = $1", queue_name)
+        .fetch_one(conn)
+        .await;
     sqlx::query!(
         "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by) VALUES($1, $2, $3, $4, NULL, NULL)",
     message.headers, content, queue.unwrap().id, Utc::now().naive_utc()).execute(conn).await.unwrap();
+}
+
+async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
+    debug!("Store message: {:?}", message);
+    let exchange_name = message.exchange.as_ref().unwrap();
+    let routing_key = message.routing_key.as_ref().unwrap();
+    if exchange_name == "" {
+        insert_into_named_queue(conn, routing_key, message, content).await;
+        return;
+    }
+    let exchange = sqlx::query!(
+        "SELECT id, _type FROM exchange WHERE _name = $1",
+        &exchange_name
+    )
+    .fetch_one(conn)
+    .await
+    .unwrap();
+    if exchange._type == "topic" {
+        let binds = sqlx::query!(
+            "SELECT id, queue_id, routing_key FROM bind WHERE exchange_id = $1",
+            &exchange.id
+        )
+        .fetch_all(conn)
+        .await
+        .unwrap();
+        for bind in binds {
+            // * (star) can substitute for exactly one word.
+            // # (hash) can substitute for zero or more words.
+            let pattern = Regex::new(&str::replace(
+                &str::replace(&bind.routing_key, "*", r"[^\.]+"),
+                "#",
+                r"[^\.]*",
+            ))
+            .unwrap();
+            if pattern.is_match(routing_key) {
+                sqlx::query!(
+                    "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by) VALUES($1, $2, $3, $4, NULL, NULL)",
+                message.headers, content, bind.queue_id, Utc::now().naive_utc()).execute(conn).await.unwrap();
+            }
+        }
+    } else {
+        panic!("{:?}", exchange);
+    }
 }
 
 async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
@@ -254,7 +344,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             todo!();
                         }
                         lazy_static! {
-                            static ref NULL_SPLIT: Regex = Regex::new("\u{0}").unwrap();
+                            static ref NULL_SPLIT: BytesRegex = BytesRegex::new("\u{0}").unwrap();
                         }
                         let bytes_response = start_ok.response.as_str().as_bytes();
                         let login: Vec<_> = NULL_SPLIT
@@ -332,7 +422,8 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             ))
                             .await?;
                     }
-                    QueueMethods::Bind(_bind) => {
+                    QueueMethods::Bind(bind) => {
+                        store_bind(&conn, &bind).await;
                         connection
                             .write_frame(AMQPFrame::Method(
                                 channel,
