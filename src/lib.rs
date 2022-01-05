@@ -472,6 +472,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             sender.clone(),
                             channel,
                             consume.queue.to_string(),
+                            consume.consumer_tag.to_string()
                         ));
                         sender.send(AMQPFrame::Method(
                             channel,
@@ -530,6 +531,7 @@ async fn delivery(
     sender: UnboundedSender<AMQPFrame>,
     channel: u16,
     queue_name: String,
+    consumer_tag: String
 ) {
     let queue = sqlx::query!("SELECT id FROM queue WHERE _name = $1", queue_name)
         .fetch_one(&conn)
@@ -538,7 +540,9 @@ async fn delivery(
 
     let mut delivery_tag: u64 = 1;
 
-    debug!("Delivery thread for {} ({})", queue_name, queue.id);
+    debug!("Delivery thread for {} ({}), {}", queue_name, queue.id, consumer_tag);
+
+    let consumer_tag_ss  =  ShortString::from(consumer_tag);
 
     loop {
         let possible = sqlx::query!(
@@ -551,7 +555,7 @@ async fn delivery(
                 .send(AMQPFrame::Method(
                     channel,
                     AMQPClass::Basic(BasicMethods::Deliver(Deliver {
-                        consumer_tag: ShortString::from(""), // FIXME: correct value
+                        consumer_tag: consumer_tag_ss.clone(),
                         delivery_tag: delivery_tag,
                         redelivered: false,
                         exchange: ShortString::from(""), // FIXME correct value
@@ -567,7 +571,7 @@ async fn delivery(
             sender
                 .send(AMQPFrame::Header(
                     channel,
-                    0,
+                    60,
                     Box::new(AMQPContentHeader {
                         class_id: 60,
                         weight: 0,
