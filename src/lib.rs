@@ -537,7 +537,7 @@ async fn delivery(
 
     loop {
         let possible = sqlx::query!(
-            "SELECT id, arguments, body FROM message WHERE queue_id = $1 AND consumed_at = NULL ORDER by recieved_at LIMIT 1"
+            "SELECT id, arguments, body FROM message WHERE queue_id = $1 AND consumed_at IS NULL ORDER by recieved_at LIMIT 1"
             , queue.id)
             .fetch_one(&conn)
             .await;
@@ -564,13 +564,14 @@ async fn delivery(
                     channel,
                     0,
                     Box::new(AMQPContentHeader {
-                        class_id: 0,
+                        class_id: 60,
                         weight: 0,
                         body_size: message.body.len() as u64,
                         properties: properties,
                     }),
                 ))
                 .unwrap();
+            sender.send(AMQPFrame::Body(channel, message.body)).unwrap();
             delivery_tag += 1;
         } else {
             time::sleep(Duration::from_secs(1)).await;
