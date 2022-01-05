@@ -149,7 +149,7 @@ impl ConnectionWriter {
 
     async fn write_frame(&mut self, frame: AMQPFrame) -> Result<()> {
         if let AMQPFrame::Body(_channel, content) = &frame {
-            let string_content = String::from_utf8_lossy(&content);
+            let string_content = String::from_utf8_lossy(content);
             info!("Output Body: {}", string_content);
         } else {
             debug!("Output Frame: {:?}", frame);
@@ -291,7 +291,7 @@ struct Message {
 
 async fn insert_into_named_queue(
     conn: &PgPool,
-    queue_name: &String,
+    queue_name: &str,
     message: &Message,
     content: Vec<u8>,
 ) {
@@ -307,7 +307,7 @@ async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
     debug!("Store message: {:?}", message);
     let exchange_name = message.exchange.as_ref().unwrap();
     let routing_key = message.routing_key.as_ref().unwrap();
-    if exchange_name == "" {
+    if exchange_name.is_empty() {
         insert_into_named_queue(conn, routing_key, message, content).await;
         return;
     }
@@ -523,7 +523,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
             AMQPFrame::Header(_channel, _class_id, content) => {
                 assert_ne!(current_message.kind, MessageType::Nothing);
                 let headers = content.properties.headers().as_ref().unwrap();
-                current_message.headers = Some(fieldtable_to_json(&headers));
+                current_message.headers = Some(fieldtable_to_json(headers));
                 current_message.body_size = Some(content.body_size);
             }
             AMQPFrame::Body(_channel, content) => {
@@ -574,7 +574,7 @@ async fn delivery(
                     channel,
                     AMQPClass::Basic(BasicMethods::Deliver(Deliver {
                         consumer_tag: consumer_tag_ss.clone(),
-                        delivery_tag: delivery_tag,
+                        delivery_tag,
                         redelivered: false,
                         exchange: ShortString::from(""), // FIXME correct value
                         routing_key: ShortString::from(""), // FIXME correct value,
@@ -594,7 +594,7 @@ async fn delivery(
                         class_id: 60,
                         weight: 0,
                         body_size: message.body.len() as u64,
-                        properties: properties,
+                        properties,
                     }),
                 ))
                 .unwrap();
