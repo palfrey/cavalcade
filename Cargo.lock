@@ -196,6 +196,7 @@ dependencies = [
  "simplelog",
  "sqlx",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -1484,6 +1485,7 @@ dependencies = [
  "thiserror",
  "tokio-stream",
  "url",
+ "uuid",
  "webpki",
  "webpki-roots",
  "whoami",

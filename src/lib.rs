@@ -25,7 +25,7 @@ use lazy_static::lazy_static;
 use log::{debug, info};
 use regex::{bytes::Regex as BytesRegex, Regex};
 use sqlx::PgPool;
-use std::{borrow::Cow, collections::BTreeMap, env, time::Duration};
+use std::{borrow::Cow, collections::BTreeMap, env, fs, ops::Deref, time::Duration};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{
@@ -35,6 +35,20 @@ use tokio::{
     sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
     time,
 };
+use uuid::Uuid;
+
+lazy_static! {
+    static ref NODE_ID: Uuid = {
+        let raw = fs::read_to_string(".node_id");
+        if let Ok(data) = raw {
+            Uuid::parse_str(&data).unwrap()
+        } else {
+            let new_id = Uuid::new_v4();
+            fs::write(".node_id", new_id.to_string()).unwrap();
+            new_id
+        }
+    };
+}
 
 async fn get_db_connection() -> Result<PgPool> {
     dotenv().ok();
@@ -56,6 +70,7 @@ pub async fn server() -> Result<()> {
         tokio::spawn(process(pool.clone(), socket));
     }
 }
+
 pub struct ConnectionReader {
     stream: OwnedReadHalf,
     buffer: Vec<u8>,
@@ -472,7 +487,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             sender.clone(),
                             channel,
                             consume.queue.to_string(),
-                            consume.consumer_tag.to_string()
+                            consume.consumer_tag.to_string(),
                         ));
                         sender.send(AMQPFrame::Method(
                             channel,
@@ -531,7 +546,7 @@ async fn delivery(
     sender: UnboundedSender<AMQPFrame>,
     channel: u16,
     queue_name: String,
-    consumer_tag: String
+    consumer_tag: String,
 ) {
     let queue = sqlx::query!("SELECT id FROM queue WHERE _name = $1", queue_name)
         .fetch_one(&conn)
@@ -540,9 +555,12 @@ async fn delivery(
 
     let mut delivery_tag: u64 = 1;
 
-    debug!("Delivery thread for {} ({}), {}", queue_name, queue.id, consumer_tag);
+    debug!(
+        "Delivery thread for {} ({}), {}",
+        queue_name, queue.id, consumer_tag
+    );
 
-    let consumer_tag_ss  =  ShortString::from(consumer_tag);
+    let consumer_tag_ss = ShortString::from(consumer_tag);
 
     loop {
         let possible = sqlx::query!(
@@ -582,6 +600,14 @@ async fn delivery(
                 .unwrap();
             sender.send(AMQPFrame::Body(channel, message.body)).unwrap();
             delivery_tag += 1;
+            sqlx::query!(
+                "UPDATE message SET consumed_by = $1, consumed_at = now() WHERE id = $2",
+                NODE_ID.deref(),
+                message.id
+            )
+            .execute(&conn)
+            .await
+            .unwrap();
         } else {
             time::sleep(Duration::from_secs(1)).await;
         }
