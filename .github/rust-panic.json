@@ -5,11 +5,10 @@
             "pattern": [
                 {
                     "regexp": "thread '.+' panicked at '(.+)', ([^:]+):(\\d+):(\\d+)",
-                    "file": 3,
-                    "line": 4,
-                    "column": 5,
-                    "severity": 3,
-                    "message": 2
+                    "file": 2,
+                    "line": 3,
+                    "column": 4,
+                    "message": 1
                 }
             ]
         }
