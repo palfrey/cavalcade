@@ -92,8 +92,6 @@ impl ConnectionReader {
             // Read into the buffer, tracking the number
             // of bytes read
             let n = self.stream.read(&mut self.buffer[self.cursor..]).await?;
-
-            debug!("Got {} bytes", n);
             if 0 == n {
                 if self.cursor == 0 {
                     return Ok(None);
@@ -123,8 +121,8 @@ impl ConnectionWriter {
     }
 
     async fn run(mut self) {
+        debug!("Waiting for frame");
         loop {
-            debug!("Waiting for frame");
             let msg = self.receiver.recv().await;
             if let Some(frame) = msg {
                 self.write_frame(frame).await.unwrap();
@@ -135,7 +133,12 @@ impl ConnectionWriter {
     }
 
     async fn write_frame(&mut self, frame: AMQPFrame) -> Result<()> {
-        debug!("Output Frame: {:?}", frame);
+        if let AMQPFrame::Body(_channel, content) = &frame {
+            let string_content = String::from_utf8_lossy(&content);
+            info!("Output Body: {}", string_content);
+        } else {
+            debug!("Output Frame: {:?}", frame);
+        }
         let mut write_buffer = vec![];
         write_buffer = amq_protocol::frame::gen_frame(&frame)(WriteContext {
             write: write_buffer,
@@ -534,6 +537,8 @@ async fn delivery(
         .unwrap();
 
     let mut delivery_tag: u64 = 1;
+
+    debug!("Delivery thread for {} ({})", queue_name, queue.id);
 
     loop {
         let possible = sqlx::query!(
