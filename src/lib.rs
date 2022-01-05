@@ -260,15 +260,9 @@ async fn store_bind(conn: &PgPool, bind: &Bind) {
         .await
         .unwrap();
     } else {
-        let queue = sqlx::query!("SELECT id FROM queue WHERE _name = $1", queue_name)
-            .fetch_one(conn)
-            .await;
-        let exchange = sqlx::query!("SELECT id FROM exchange WHERE _name = $1", exchange_name)
-            .fetch_one(conn)
-            .await;
-        sqlx::query!("INSERT INTO bind (queue_id, exchange_id, routing_key, _nowait, arguments) VALUES($1, $2, $3, $4, $5)",
-            queue.unwrap().id,
-            exchange.unwrap().id,
+        sqlx::query!("INSERT INTO bind (queue_id, exchange_id, routing_key, _nowait, arguments) VALUES((SELECT id FROM queue WHERE _name = $1), (SELECT id FROM exchange WHERE _name = $2), $3, $4, $5)",
+            queue_name,
+            exchange_name,
             routing_key,
             bind.nowait,
             fieldtable_to_json(&bind.arguments)).execute(conn).await.unwrap();
