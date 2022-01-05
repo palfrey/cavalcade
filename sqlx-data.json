@@ -1,5 +1,37 @@
 {
   "db": "PostgreSQL",
+  "279817ebcf4c53763ca27e254dce18d1bf5c800c80668a1c58fb3f8aaa08d353": {
+    "query": "SELECT id, arguments, body FROM message WHERE queue_id = $1 AND consumed_at IS NULL ORDER by recieved_at LIMIT 1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "arguments",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 2,
+          "name": "body",
+          "type_info": "Bytea"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "338326815b0ff37bda1159cb253334a5f7fa054bfbf3f744e2942ee362194049": {
     "query": "SELECT id FROM exchange WHERE _name = $1",
     "describe": {
@@ -188,6 +220,19 @@
         "Left": [
           "Bool",
           "Jsonb",
+          "Int4"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "de17f5e8ce55ac9bd982ce89ce19cf61d15228f1799d241956834fe90e2f5ad3": {
+    "query": "UPDATE message SET consumed_by = $1, consumed_at = now() WHERE id = $2",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
           "Int4"
         ]
       },
