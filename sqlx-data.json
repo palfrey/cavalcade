@@ -52,6 +52,22 @@
       ]
     }
   },
+  "455430a25d2cff6c97369b1980eaaa9bcbaf0202a4f5fcf46eb69d69a459af58": {
+    "query": "INSERT INTO bind (queue_id, exchange_id, routing_key, _nowait, arguments) VALUES((SELECT id FROM queue WHERE _name = $1), (SELECT id FROM exchange WHERE _name = $2), $3, $4, $5)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Varchar",
+          "Bool",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "4e642bf484306848f4be88c77337d31617b75fa9d2779cbadb6ff6ab28eaf6a4": {
     "query": "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by) VALUES($1, $2, $3, $4, NULL, NULL)",
     "describe": {
@@ -194,22 +210,6 @@
         false,
         false
       ]
-    }
-  },
-  "c941debae0c691d40cb327da176caa7243e06b3811309dbc5c6c7e7d8ebfdbba": {
-    "query": "INSERT INTO bind (queue_id, exchange_id, routing_key, _nowait, arguments) VALUES($1, $2, $3, $4, $5)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Int4",
-          "Int4",
-          "Varchar",
-          "Bool",
-          "Jsonb"
-        ]
-      },
-      "nullable": []
     }
   },
   "c9dacc8452436daeaf9f2faaddfa4496512cba917bbc3597e8151d589f7b9d00": {
