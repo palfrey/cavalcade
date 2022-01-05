@@ -145,6 +145,7 @@ impl ConnectionWriter {
                 break;
             }
         }
+        self.close().await.unwrap();
     }
 
     async fn write_frame(&mut self, frame: AMQPFrame) -> Result<()> {
