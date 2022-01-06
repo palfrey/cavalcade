@@ -282,20 +282,16 @@ struct Message {
     routing_key: Option<String>,
     body_size: Option<u64>,
     headers: Option<serde_json::Value>,
+    delivery_mode: Option<u8>,
+    priority: Option<u8>,
+    correlation_id: Option<String>,
+    reply_to: Option<String>,
 }
 
-async fn insert_into_named_queue(
-    conn: &PgPool,
-    queue_name: &str,
-    message: &Message,
-    content: Vec<u8>,
-) {
-    let queue = sqlx::query!("SELECT id FROM queue WHERE _name = $1", queue_name)
-        .fetch_one(conn)
-        .await;
+async fn insert_into_queue_id(conn: &PgPool, queue_id: i32, message: &Message, content: &[u8]) {
     sqlx::query!(
-        "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by) VALUES($1, $2, $3, $4, NULL, NULL)",
-    message.headers, content, queue.unwrap().id, Utc::now().naive_utc()).execute(conn).await.unwrap();
+        "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to) VALUES($1, $2, $3, $4, NULL, NULL, $5, (SELECT id from exchange WHERE _name = $6), $7, $8, $9, $10)",
+    message.headers, content, queue_id, Utc::now().naive_utc(), message.routing_key, message.exchange, message.delivery_mode.map(|x| x as i32), message.priority.map(|x| x as i32), message.correlation_id, message.reply_to).execute(conn).await.unwrap();
 }
 
 async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
@@ -303,7 +299,10 @@ async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
     let exchange_name = message.exchange.as_ref().unwrap();
     let routing_key = message.routing_key.as_ref().unwrap();
     if exchange_name.is_empty() {
-        insert_into_named_queue(conn, routing_key, message, content).await;
+        let queue = sqlx::query!("SELECT id FROM queue WHERE _name = $1", routing_key)
+            .fetch_one(conn)
+            .await;
+        insert_into_queue_id(conn, queue.unwrap().id, message, &content).await;
         return;
     }
     let exchange = sqlx::query!(
@@ -331,9 +330,7 @@ async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
             ))
             .unwrap();
             if pattern.is_match(routing_key) {
-                sqlx::query!(
-                    "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by) VALUES($1, $2, $3, $4, NULL, NULL)",
-                message.headers, content, bind.queue_id, Utc::now().naive_utc()).execute(conn).await.unwrap();
+                insert_into_queue_id(conn, bind.queue_id, message, &content).await;
             }
         }
     } else {
@@ -359,6 +356,10 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
         routing_key: None,
         body_size: None,
         headers: None,
+        delivery_mode: None,
+        priority: None,
+        correlation_id: None,
+        reply_to: None,
     };
 
     while let Some(frame) = connection.read_frame().await.unwrap() {
@@ -520,6 +521,18 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                 let headers = content.properties.headers().as_ref().unwrap();
                 current_message.headers = Some(fieldtable_to_json(headers));
                 current_message.body_size = Some(content.body_size);
+                current_message.correlation_id = content
+                    .properties
+                    .correlation_id()
+                    .as_ref()
+                    .map(|s| s.to_string());
+                current_message.delivery_mode = *content.properties.delivery_mode();
+                current_message.priority = *content.properties.priority();
+                current_message.reply_to = content
+                    .properties
+                    .reply_to()
+                    .as_ref()
+                    .map(|s| s.to_string());
             }
             AMQPFrame::Body(_channel, content) => {
                 let string_content = String::from_utf8_lossy(&content);
@@ -559,7 +572,7 @@ async fn delivery(
 
     loop {
         let possible = sqlx::query!(
-            "SELECT id, arguments, body FROM message WHERE queue_id = $1 AND consumed_at IS NULL ORDER by recieved_at LIMIT 1"
+            "SELECT id, arguments, body, routing_key, correlation_id, reply_to, delivery_mode, _priority FROM message WHERE queue_id = $1 AND consumed_at IS NULL ORDER by recieved_at LIMIT 1"
             , queue.id)
             .fetch_one(&conn)
             .await;
@@ -572,15 +585,29 @@ async fn delivery(
                         delivery_tag,
                         redelivered: false,
                         exchange: ShortString::from(""), // FIXME correct value
-                        routing_key: ShortString::from(""), // FIXME correct value,
+                        routing_key: ShortString::from(
+                            message.routing_key.unwrap_or(String::from("")),
+                        ),
                     })),
                 ))
                 .unwrap();
-            let properties = AMQPProperties::default().with_headers(
+            let mut properties = AMQPProperties::default().with_headers(
                 serde_json::from_value::<BTreeMap<ShortString, AMQPValue>>(message.arguments)
                     .unwrap()
                     .into(),
             );
+            if let Some(correlation_id) = message.correlation_id {
+                properties = properties.with_correlation_id(ShortString::from(correlation_id));
+            }
+            if let Some(reply_to) = message.reply_to {
+                properties = properties.with_reply_to(ShortString::from(reply_to));
+            }
+            if let Some(delivery_mode) = message.delivery_mode {
+                properties = properties.with_delivery_mode(delivery_mode as u8);
+            }
+            if let Some(priority) = message._priority {
+                properties = properties.with_priority(priority as u8);
+            }
             sender
                 .send(AMQPFrame::Header(
                     channel,
