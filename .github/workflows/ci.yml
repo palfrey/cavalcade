@@ -69,23 +69,26 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v2.3.4
-            - uses: jwalton/gh-find-current-pr@v1
-              id: findPr
-              with:
-                  state: open
-            - run: echo "::add-matcher::.github/rust-panic.json"
+            # - uses: jwalton/gh-find-current-pr@v1
+            #   id: findPr
+            #   with:
+            #       state: open
+            # - run: echo "::add-matcher::.github/rust-panic.json"
             - uses: satackey/action-docker-layer-caching@v0.0.11
-            - run: docker-compose up --build --exit-code test-celery
-            - name: Check annotations
-              uses: actions/github-script@v5
-              if: success() && steps.findPr.outputs.number
-              env:
-                  PR_NUM: ${{ steps.findPr.outputs.pr }}
-                  REPO_OWNER: ${{github.repository_owner}}
-              with:
-                  script: |
-                      const script = require('.github/no-annotations.js')
-                      await script({github, context, core})
+            - run: |-
+                  docker-compose up --build --exit-code test-celery | tee -i all.log
+                  grep "exited with code 0" all.log
+                  grep -c panic all.log
+            # - name: Check annotations
+            #   uses: actions/github-script@v5
+            #   if: success() && steps.findPr.outputs.number
+            #   env:
+            #       PR_NUM: ${{ steps.findPr.outputs.pr }}
+            #       REPO_OWNER: ${{github.repository_owner}}
+            #   with:
+            #       script: |
+            #           const script = require('.github/no-annotations.js')
+            #           await script({github, context, core})
 
     # crdb-integration-test:
     #     name: Cockroach Integration Test
