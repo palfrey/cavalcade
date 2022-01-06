@@ -288,10 +288,15 @@ struct Message {
     reply_to: Option<String>,
 }
 
-async fn insert_into_queue_id(conn: &PgPool, queue_id: i32, message: &Message, content: &[u8]) {
+async fn insert_into_queue_name(
+    conn: &PgPool,
+    queue_name: &str,
+    message: &Message,
+    content: &[u8],
+) {
     sqlx::query!(
-        "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to) VALUES($1, $2, $3, $4, NULL, NULL, $5, (SELECT id from exchange WHERE _name = $6), $7, $8, $9, $10)",
-    message.headers, content, queue_id, Utc::now().naive_utc(), message.routing_key, message.exchange, message.delivery_mode.map(|x| x as i32), message.priority.map(|x| x as i32), message.correlation_id, message.reply_to).execute(conn).await.unwrap();
+        "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to) VALUES($1, $2, (SELECT id from queue WHERE _name = $3), $4, NULL, NULL, $5, (SELECT id from exchange WHERE _name = $6), $7, $8, $9, $10)",
+    message.headers, content, queue_name, Utc::now().naive_utc(), message.routing_key, message.exchange, message.delivery_mode.map(|x| x as i32), message.priority.map(|x| x as i32), message.correlation_id, message.reply_to).execute(conn).await.unwrap();
 }
 
 async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
@@ -299,10 +304,7 @@ async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
     let exchange_name = message.exchange.as_ref().unwrap();
     let routing_key = message.routing_key.as_ref().unwrap();
     if exchange_name.is_empty() {
-        let queue = sqlx::query!("SELECT id FROM queue WHERE _name = $1", routing_key)
-            .fetch_one(conn)
-            .await;
-        insert_into_queue_id(conn, queue.unwrap().id, message, &content).await;
+        insert_into_queue_name(conn, routing_key, message, &content).await;
         return;
     }
     let exchange = sqlx::query!(
@@ -313,7 +315,7 @@ async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
     .await
     .unwrap();
     let binds = sqlx::query!(
-        "SELECT id, queue_id, routing_key FROM bind WHERE exchange_id = $1",
+        "SELECT bind.id as id, queue._name as queue_name, routing_key FROM bind JOIN queue ON queue.id = queue_id WHERE exchange_id = $1",
         &exchange.id
     )
     .fetch_all(conn)
@@ -330,12 +332,12 @@ async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
             ))
             .unwrap();
             if pattern.is_match(routing_key) {
-                insert_into_queue_id(conn, bind.queue_id, message, &content).await;
+                insert_into_queue_name(conn, &bind.queue_name, message, &content).await;
             }
         }
     } else if exchange._type == "fanout" {
         for bind in binds {
-            insert_into_queue_id(conn, bind.queue_id, message, &content).await;
+            insert_into_queue_name(conn, &bind.queue_name, message, &content).await;
         }
     } else {
         panic!("{:?}", exchange);

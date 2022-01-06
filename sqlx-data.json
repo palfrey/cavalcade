@@ -20,27 +20,6 @@
       ]
     }
   },
-  "400825daa3df6d6288ac999eee9e4c91e7d6a1a4f455489c702be36ad195ca9e": {
-    "query": "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to) VALUES($1, $2, $3, $4, NULL, NULL, $5, (SELECT id from exchange WHERE _name = $6), $7, $8, $9, $10)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Jsonb",
-          "Bytea",
-          "Int4",
-          "Timestamp",
-          "Varchar",
-          "Text",
-          "Int4",
-          "Int4",
-          "Varchar",
-          "Varchar"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "455430a25d2cff6c97369b1980eaaa9bcbaf0202a4f5fcf46eb69d69a459af58": {
     "query": "INSERT INTO bind (queue_id, exchange_id, routing_key, _nowait, arguments) VALUES((SELECT id FROM queue WHERE _name = $1), (SELECT id FROM exchange WHERE _name = $2), $3, $4, $5)",
     "describe": {
@@ -55,6 +34,38 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "55c797db1549c5f9fa0f1528f1d7b9f84e1e3f23cc98b785f148490676679805": {
+    "query": "SELECT bind.id as id, queue._name as queue_name, routing_key FROM bind JOIN queue ON queue.id = queue_id WHERE exchange_id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "queue_name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "routing_key",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
     }
   },
   "62c76ddd7c04b7249394d5020ad4c75265bf8053acacc9bd78c3ddd9b80bf360": {
@@ -137,6 +148,27 @@
       "nullable": []
     }
   },
+  "8c2e62ab8155b1b9415dfb6e502ec1f14bfa212b73497ea6a912ae5a110bba6d": {
+    "query": "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to) VALUES($1, $2, (SELECT id from queue WHERE _name = $3), $4, NULL, NULL, $5, (SELECT id from exchange WHERE _name = $6), $7, $8, $9, $10)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Jsonb",
+          "Bytea",
+          "Text",
+          "Timestamp",
+          "Varchar",
+          "Text",
+          "Int4",
+          "Int4",
+          "Varchar",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "9d0930e105442800649bc4f8e354115a5b0b2f87ceed504085ba4e9a4837f823": {
     "query": "\n            UPDATE exchange SET passive = $1, durable = $2, auto_delete = $3, _nowait = $4, arguments = $5\n            WHERE id = $6",
     "describe": {
@@ -152,38 +184,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "b5612cc08c4239e22074df9b4ef08be64b15b8fe06005f8ac339e225216247fb": {
-    "query": "SELECT id, queue_id, routing_key FROM bind WHERE exchange_id = $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "queue_id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 2,
-          "name": "routing_key",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false
-      ]
     }
   },
   "c3755d3875e90cc4eff14f6ae18da69af5b5033def12dce1aa19a543491452bd": {
