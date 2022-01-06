@@ -1,37 +1,5 @@
 {
   "db": "PostgreSQL",
-  "279817ebcf4c53763ca27e254dce18d1bf5c800c80668a1c58fb3f8aaa08d353": {
-    "query": "SELECT id, arguments, body FROM message WHERE queue_id = $1 AND consumed_at IS NULL ORDER by recieved_at LIMIT 1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "arguments",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 2,
-          "name": "body",
-          "type_info": "Bytea"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Int4"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "338326815b0ff37bda1159cb253334a5f7fa054bfbf3f744e2942ee362194049": {
     "query": "SELECT id FROM exchange WHERE _name = $1",
     "describe": {
@@ -52,6 +20,27 @@
       ]
     }
   },
+  "400825daa3df6d6288ac999eee9e4c91e7d6a1a4f455489c702be36ad195ca9e": {
+    "query": "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to) VALUES($1, $2, $3, $4, NULL, NULL, $5, (SELECT id from exchange WHERE _name = $6), $7, $8, $9, $10)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Jsonb",
+          "Bytea",
+          "Int4",
+          "Timestamp",
+          "Varchar",
+          "Text",
+          "Int4",
+          "Int4",
+          "Varchar",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "455430a25d2cff6c97369b1980eaaa9bcbaf0202a4f5fcf46eb69d69a459af58": {
     "query": "INSERT INTO bind (queue_id, exchange_id, routing_key, _nowait, arguments) VALUES((SELECT id FROM queue WHERE _name = $1), (SELECT id FROM exchange WHERE _name = $2), $3, $4, $5)",
     "describe": {
@@ -63,21 +52,6 @@
           "Varchar",
           "Bool",
           "Jsonb"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "4e642bf484306848f4be88c77337d31617b75fa9d2779cbadb6ff6ab28eaf6a4": {
-    "query": "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by) VALUES($1, $2, $3, $4, NULL, NULL)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Jsonb",
-          "Bytea",
-          "Int4",
-          "Timestamp"
         ]
       },
       "nullable": []
@@ -209,6 +183,68 @@
         false,
         false,
         false
+      ]
+    }
+  },
+  "c3755d3875e90cc4eff14f6ae18da69af5b5033def12dce1aa19a543491452bd": {
+    "query": "SELECT id, arguments, body, routing_key, correlation_id, reply_to, delivery_mode, _priority FROM message WHERE queue_id = $1 AND consumed_at IS NULL ORDER by recieved_at LIMIT 1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "arguments",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 2,
+          "name": "body",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 3,
+          "name": "routing_key",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "correlation_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "reply_to",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 6,
+          "name": "delivery_mode",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 7,
+          "name": "_priority",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Int4"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true
       ]
     }
   },
