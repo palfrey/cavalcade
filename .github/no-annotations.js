@@ -19,7 +19,7 @@ module.exports = async ({github, context, core}) => {
       ref: pullRequest.head.sha,
     });
 
-    console.log(checks)
+    console.log(JSON.stringify(checks))
 
     for (check in checks.data.check_runs) {
       console.log(check)
