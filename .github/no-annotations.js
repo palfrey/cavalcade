@@ -12,5 +12,22 @@ module.exports = async ({github, context, core}) => {
     });
 
     console.log(pullRequest);
+
+    const checks = await github.rest.checks.listForRef({
+      owner: REPO_OWNER,
+      repo: 'cavalcade',
+      ref: pullRequest.head.sha,
+    });
+
+    console.log(checks)
+
+    for (check in checks.check_runs) {
+      const annotations = await github.rest.checks.listAnnotations({
+        owner: REPO_OWNER,
+        repo: 'cavalcade',
+        check: check.id
+      });
+      console.log(annotations);
+    }
     throw "foo";
 }
