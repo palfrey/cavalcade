@@ -69,9 +69,14 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v2.3.4
+            - uses: jwalton/gh-find-current-pr@v1
+              id: findPr
+              with:
+                  state: open
             - uses: actions/github-script@v5
+              if: success() && steps.findPr.outputs.number
               env:
-                  PR_NUM: ${{github.event.issue.number}}
+                  PR_NUM: ${{ steps.findPr.outputs.pr }}
                   REPO_OWNER: ${{github.repository_owner}}
               with:
                   script: |
