@@ -312,14 +312,14 @@ async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
     .fetch_one(conn)
     .await
     .unwrap();
+    let binds = sqlx::query!(
+        "SELECT id, queue_id, routing_key FROM bind WHERE exchange_id = $1",
+        &exchange.id
+    )
+    .fetch_all(conn)
+    .await
+    .unwrap();
     if exchange._type == "topic" {
-        let binds = sqlx::query!(
-            "SELECT id, queue_id, routing_key FROM bind WHERE exchange_id = $1",
-            &exchange.id
-        )
-        .fetch_all(conn)
-        .await
-        .unwrap();
         for bind in binds {
             // * (star) can substitute for exactly one word.
             // # (hash) can substitute for zero or more words.
@@ -332,6 +332,10 @@ async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
             if pattern.is_match(routing_key) {
                 insert_into_queue_id(conn, bind.queue_id, message, &content).await;
             }
+        }
+    } else if exchange._type == "fanout" {
+        for bind in binds {
+            insert_into_queue_id(conn, bind.queue_id, message, &content).await;
         }
     } else {
         panic!("{:?}", exchange);
