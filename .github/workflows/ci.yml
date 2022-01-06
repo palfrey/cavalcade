@@ -73,7 +73,11 @@ jobs:
               id: findPr
               with:
                   state: open
-            - uses: actions/github-script@v5
+            - run: echo "::add-matcher::.github/rust-panic.json"
+            - uses: satackey/action-docker-layer-caching@v0.0.11
+            - run: docker-compose up --build --exit-code test-celery
+            - name: Check annotations
+              uses: actions/github-script@v5
               if: success() && steps.findPr.outputs.number
               env:
                   PR_NUM: ${{ steps.findPr.outputs.pr }}
@@ -82,9 +86,6 @@ jobs:
                   script: |
                       const script = require('.github/no-annotations.js')
                       await script({github, context, core})
-            - run: echo "::add-matcher::.github/rust-panic.json"
-            - uses: satackey/action-docker-layer-caching@v0.0.11
-            - run: docker-compose up --build --exit-code test-celery
 
     # crdb-integration-test:
     #     name: Cockroach Integration Test

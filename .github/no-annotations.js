@@ -28,7 +28,6 @@ module.exports = async ({github, context, core}) => {
         repo: 'cavalcade',
         check_run_id: check.id
       });
-      console.log(annotations);
+      console.log(annotations.data);
     }
-    throw "foo";
 }
