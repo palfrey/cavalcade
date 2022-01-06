@@ -21,7 +21,7 @@ module.exports = async ({github, context, core}) => {
 
     console.log(JSON.stringify(checks))
 
-    for (check in checks.data.check_runs) {
+    for (const check of checks.data.check_runs) {
       console.log(check)
       const annotations = await github.rest.checks.listAnnotations({
         owner: REPO_OWNER,
