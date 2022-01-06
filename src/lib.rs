@@ -590,7 +590,7 @@ async fn delivery(
                         redelivered: false,
                         exchange: ShortString::from(""), // FIXME correct value
                         routing_key: ShortString::from(
-                            message.routing_key.unwrap_or(String::from("")),
+                            message.routing_key.unwrap_or_else(|| String::from("")),
                         ),
                     })),
                 ))
