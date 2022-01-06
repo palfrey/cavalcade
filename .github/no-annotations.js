@@ -26,7 +26,7 @@ module.exports = async ({github, context, core}) => {
       const annotations = await github.rest.checks.listAnnotations({
         owner: REPO_OWNER,
         repo: 'cavalcade',
-        check: check.id
+        check_run_id: check.id
       });
       console.log(annotations);
     }
