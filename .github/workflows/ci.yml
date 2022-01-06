@@ -69,6 +69,13 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v2.3.4
+            - uses: actions/github-script@v5
+              env:
+                  SHA: ${{env.parentSHA}}
+              with:
+                  script: |
+                      const script = require('.github/no-annotations.js')
+                      await script({github, context, core})
             - run: echo "::add-matcher::.github/rust-panic.json"
             - uses: satackey/action-docker-layer-caching@v0.0.11
             - run: docker-compose up --build --exit-code test-celery
