@@ -75,7 +75,8 @@ jobs:
             #       state: open
             # - run: echo "::add-matcher::.github/rust-panic.json"
             - uses: satackey/action-docker-layer-caching@v0.0.11
-            - run: |-
+            - name: Run test-celery
+              run: |-
                   set -euo pipefail
                   docker-compose up --build --exit-code test-celery | tee -i all.log
                   grep "exited with code 0" all.log
