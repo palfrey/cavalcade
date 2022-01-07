@@ -1,8 +1,0 @@
-ALTER TABLE message
-ADD COLUMN delivery_mode INTEGER NULL,
-ADD COLUMN _priority INTEGER NULL,
-ADD COLUMN correlation_id VARCHAR(256),
-ADD COLUMN reply_to VARCHAR(256),
-ADD COLUMN exchange_id INTEGER NULL,
-ADD COLUMN routing_key VARCHAR (256) NULL,
-ADD FOREIGN KEY (exchange_id) REFERENCES exchange (id);

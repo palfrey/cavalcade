@@ -1,5 +1,5 @@
 CREATE TABLE queue (
-    id SERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY,
     _name VARCHAR (256) NOT NULL,
     passive BOOLEAN NOT NULL,
     durable BOOLEAN NOT NULL,
@@ -10,19 +10,8 @@ CREATE TABLE queue (
     UNIQUE(_name)
 );
 
-CREATE TABLE message (
-    id SERIAL PRIMARY KEY,
-    arguments JSONB NOT NULL,
-    body bytea NOT NULL,
-    queue_id INTEGER NOT NULL,
-    recieved_at TIMESTAMP,
-    consumed_at TIMESTAMP NULL,
-    consumed_by UUID NULL,
-    FOREIGN KEY (queue_id) REFERENCES queue (id)
-);
-
 CREATE TABLE exchange (
-    id SERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY,
     _name VARCHAR (256) NOT NULL,
     _type VARCHAR(256) NOT NULL,
     passive BOOLEAN NOT NULL,
@@ -33,10 +22,30 @@ CREATE TABLE exchange (
     UNIQUE(_name)
 );
 
+CREATE TABLE message (
+    id UUID PRIMARY KEY,
+    arguments JSONB NOT NULL,
+    body bytea NOT NULL,
+    queue_id UUID NOT NULL,
+    recieved_at TIMESTAMP,
+    consumed_at TIMESTAMP NULL,
+    consumed_by UUID NULL,
+    delivery_mode INT4 NULL,
+    _priority INT4 NULL,
+    correlation_id VARCHAR(256),
+    reply_to VARCHAR(256),
+    exchange_id UUID NULL,
+    routing_key VARCHAR (256) NULL,
+    content_type VARCHAR(256) NULL,
+    content_encoding VARCHAR(256) NULL,
+    FOREIGN KEY (exchange_id) REFERENCES exchange (id),
+    FOREIGN KEY (queue_id) REFERENCES queue (id)
+);
+
 CREATE TABLE bind (
-    id SERIAL PRIMARY KEY,
-    queue_id INTEGER NOT NULL,
-    exchange_id INTEGER NOT NULL,
+    id UUID PRIMARY KEY,
+    queue_id UUID NOT NULL,
+    exchange_id UUID NOT NULL,
     routing_key VARCHAR (256) NOT NULL,
     _nowait BOOLEAN NOT NULL,
     arguments JSONB NOT NULL,

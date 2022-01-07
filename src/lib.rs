@@ -190,7 +190,7 @@ async fn store_queue(conn: &PgPool, declare: &QueueDeclare) {
         sqlx::query!(
             "
             UPDATE queue SET passive = $1, durable = $2, _exclusive = $3, auto_delete = $4, _nowait = $5, arguments = $6
-            WHERE id = $7",
+            WHERE id = $7", 
             declare.passive,
             declare.durable,
             declare.exclusive, declare.auto_delete, declare.nowait, fieldtable_to_json(&declare.arguments), id.unwrap()
@@ -198,7 +198,7 @@ async fn store_queue(conn: &PgPool, declare: &QueueDeclare) {
         .execute(conn)
         .await.unwrap();
     } else {
-        sqlx::query!("INSERT INTO queue (_name, passive, durable, _exclusive, auto_delete, _nowait, arguments) VALUES($1, $2, $3, $4, $5, $6, $7)",
+        sqlx::query!("INSERT INTO queue (id, _name, passive, durable, _exclusive, auto_delete, _nowait, arguments) VALUES(gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7)",
         queue_name,
         declare.passive,
         declare.durable,
@@ -225,7 +225,7 @@ async fn store_exchange(conn: &PgPool, declare: &ExchangeDeclare) {
         .execute(conn)
         .await.unwrap();
     } else {
-        sqlx::query!("INSERT INTO exchange (_name, _type, passive, durable, auto_delete, _nowait, arguments) VALUES($1, $2, $3, $4, $5, $6, $7)",
+        sqlx::query!("INSERT INTO exchange (id, _name, _type, passive, durable, auto_delete, _nowait, arguments) VALUES(gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7)",
         exchange_name,
         declare.kind.to_string(),
         declare.passive,
@@ -263,7 +263,7 @@ async fn store_bind(conn: &PgPool, bind: &Bind) {
         .await
         .unwrap();
     } else {
-        sqlx::query!("INSERT INTO bind (queue_id, exchange_id, routing_key, _nowait, arguments) VALUES((SELECT id FROM queue WHERE _name = $1), (SELECT id FROM exchange WHERE _name = $2), $3, $4, $5)",
+        sqlx::query!("INSERT INTO bind (id, queue_id, exchange_id, routing_key, _nowait, arguments) VALUES(gen_random_uuid(), (SELECT id FROM queue WHERE _name = $1), (SELECT id FROM exchange WHERE _name = $2), $3, $4, $5)",
             queue_name,
             exchange_name,
             routing_key,
@@ -300,7 +300,7 @@ async fn insert_into_queue_name(
     content: &[u8],
 ) {
     sqlx::query!(
-        "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to, content_type, content_encoding) VALUES($1, $2, (SELECT id from queue WHERE _name = $3), $4, NULL, NULL, $5, (SELECT id from exchange WHERE _name = $6), $7, $8, $9, $10, $11, $12)",
+        "INSERT INTO message (id, arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to, content_type, content_encoding) VALUES(gen_random_uuid(), $1, $2, (SELECT id from queue WHERE _name = $3), $4, NULL, NULL, $5, (SELECT id from exchange WHERE _name = $6), $7, $8, $9, $10, $11, $12)",
     message.headers, content, queue_name, Utc::now().naive_utc(), message.routing_key, message.exchange, message.delivery_mode.map(|x| x as i32), message.priority.map(|x| x as i32), message.correlation_id, message.reply_to, message.content_type, message.content_encoding).execute(conn).await.unwrap();
 }
 
@@ -606,7 +606,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
 }
 
 struct DbMessage {
-    id: i32,
+    id: Uuid,
     arguments: serde_json::Value,
     body: Vec<u8>,
     exchange: String,
