@@ -299,6 +299,7 @@ async fn insert_into_queue_name(
     message: &Message,
     content: &[u8],
 ) {
+    debug!("Inserting message into queue {}", queue_name);
     sqlx::query!(
         "INSERT INTO message (id, arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to, content_type, content_encoding) VALUES(gen_random_uuid(), $1, $2, (SELECT id from queue WHERE _name = $3), $4, NULL, NULL, $5, (SELECT id from exchange WHERE _name = $6), $7, $8, $9, $10, $11, $12)",
     message.headers, content, queue_name, Utc::now().naive_utc(), message.routing_key, message.exchange, message.delivery_mode.map(|x| x as i32), message.priority.map(|x| x as i32), message.correlation_id, message.reply_to, message.content_type, message.content_encoding).execute(conn).await.unwrap();
