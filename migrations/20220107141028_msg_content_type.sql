@@ -1,0 +1,3 @@
+ALTER TABLE message
+ADD COLUMN content_type VARCHAR(256) NULL,
+ADD COLUMN content_encoding VARCHAR(256) NULL;

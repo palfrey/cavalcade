@@ -20,6 +20,29 @@
       ]
     }
   },
+  "33a105384e2b7b474c81210ef1a4a1280d69f26d0ae9e3a8b76394aaa0246054": {
+    "query": "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to, content_type, content_encoding) VALUES($1, $2, (SELECT id from queue WHERE _name = $3), $4, NULL, NULL, $5, (SELECT id from exchange WHERE _name = $6), $7, $8, $9, $10, $11, $12)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Jsonb",
+          "Bytea",
+          "Text",
+          "Timestamp",
+          "Varchar",
+          "Text",
+          "Int4",
+          "Int4",
+          "Varchar",
+          "Varchar",
+          "Varchar",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "455430a25d2cff6c97369b1980eaaa9bcbaf0202a4f5fcf46eb69d69a459af58": {
     "query": "INSERT INTO bind (queue_id, exchange_id, routing_key, _nowait, arguments) VALUES((SELECT id FROM queue WHERE _name = $1), (SELECT id FROM exchange WHERE _name = $2), $3, $4, $5)",
     "describe": {
@@ -85,74 +108,6 @@
         false,
         false,
         false
-      ]
-    }
-  },
-  "57fd0217efe93fddafd101fb5e319d11b878c27df79cd0152457209ada0c7594": {
-    "query": "SELECT message.id as id, message.arguments, body, exc._name as exchange, routing_key, correlation_id, reply_to, delivery_mode, _priority FROM message JOIN exchange exc ON exc.id = message.exchange_id WHERE queue_id IN (SELECT id FROM queue WHERE _name = $1) AND consumed_at IS NULL ORDER by recieved_at LIMIT 1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 1,
-          "name": "arguments",
-          "type_info": "Jsonb"
-        },
-        {
-          "ordinal": 2,
-          "name": "body",
-          "type_info": "Bytea"
-        },
-        {
-          "ordinal": 3,
-          "name": "exchange",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "routing_key",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 5,
-          "name": "correlation_id",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 6,
-          "name": "reply_to",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 7,
-          "name": "delivery_mode",
-          "type_info": "Int4"
-        },
-        {
-          "ordinal": 8,
-          "name": "_priority",
-          "type_info": "Int4"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        true,
-        true,
-        true,
-        true,
-        true
       ]
     }
   },
@@ -236,27 +191,6 @@
       "nullable": []
     }
   },
-  "8c2e62ab8155b1b9415dfb6e502ec1f14bfa212b73497ea6a912ae5a110bba6d": {
-    "query": "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to) VALUES($1, $2, (SELECT id from queue WHERE _name = $3), $4, NULL, NULL, $5, (SELECT id from exchange WHERE _name = $6), $7, $8, $9, $10)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Jsonb",
-          "Bytea",
-          "Text",
-          "Timestamp",
-          "Varchar",
-          "Text",
-          "Int4",
-          "Int4",
-          "Varchar",
-          "Varchar"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "9d0930e105442800649bc4f8e354115a5b0b2f87ceed504085ba4e9a4837f823": {
     "query": "\n            UPDATE exchange SET passive = $1, durable = $2, auto_delete = $3, _nowait = $4, arguments = $5\n            WHERE id = $6",
     "describe": {
@@ -272,6 +206,86 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "c3d49af370ec5efc0c6cc0a964e7babea779d8b3810bb6f9c0eb61f018e6ddec": {
+    "query": "SELECT message.id as id, message.arguments, body, exc._name as exchange, routing_key, correlation_id, reply_to, delivery_mode, _priority, content_type, content_encoding FROM message JOIN exchange exc ON exc.id = message.exchange_id WHERE queue_id IN (SELECT id FROM queue WHERE _name = $1) AND consumed_at IS NULL ORDER by recieved_at LIMIT 1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 1,
+          "name": "arguments",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 2,
+          "name": "body",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 3,
+          "name": "exchange",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "routing_key",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "correlation_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 6,
+          "name": "reply_to",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 7,
+          "name": "delivery_mode",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 8,
+          "name": "_priority",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 9,
+          "name": "content_type",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 10,
+          "name": "content_encoding",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
     }
   },
   "c9dacc8452436daeaf9f2faaddfa4496512cba917bbc3597e8151d589f7b9d00": {

@@ -289,6 +289,8 @@ struct Message {
     priority: Option<u8>,
     correlation_id: Option<String>,
     reply_to: Option<String>,
+    content_type: Option<String>,
+    content_encoding: Option<String>,
 }
 
 async fn insert_into_queue_name(
@@ -298,8 +300,8 @@ async fn insert_into_queue_name(
     content: &[u8],
 ) {
     sqlx::query!(
-        "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to) VALUES($1, $2, (SELECT id from queue WHERE _name = $3), $4, NULL, NULL, $5, (SELECT id from exchange WHERE _name = $6), $7, $8, $9, $10)",
-    message.headers, content, queue_name, Utc::now().naive_utc(), message.routing_key, message.exchange, message.delivery_mode.map(|x| x as i32), message.priority.map(|x| x as i32), message.correlation_id, message.reply_to).execute(conn).await.unwrap();
+        "INSERT INTO message (arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to, content_type, content_encoding) VALUES($1, $2, (SELECT id from queue WHERE _name = $3), $4, NULL, NULL, $5, (SELECT id from exchange WHERE _name = $6), $7, $8, $9, $10, $11, $12)",
+    message.headers, content, queue_name, Utc::now().naive_utc(), message.routing_key, message.exchange, message.delivery_mode.map(|x| x as i32), message.priority.map(|x| x as i32), message.correlation_id, message.reply_to, message.content_type, message.content_encoding).execute(conn).await.unwrap();
 }
 
 async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
@@ -369,6 +371,8 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
         priority: None,
         correlation_id: None,
         reply_to: None,
+        content_type: None,
+        content_encoding: None,
     };
 
     while let Some(frame) = connection.read_frame().await.unwrap() {
@@ -575,6 +579,16 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                     .reply_to()
                     .as_ref()
                     .map(|s| s.to_string());
+                current_message.content_type = content
+                    .properties
+                    .content_type()
+                    .as_ref()
+                    .map(|s| s.to_string());
+                current_message.content_encoding = content
+                    .properties
+                    .content_encoding()
+                    .as_ref()
+                    .map(|s| s.to_string());
             }
             AMQPFrame::Body(_channel, content) => {
                 let string_content = String::from_utf8_lossy(&content);
@@ -601,6 +615,8 @@ struct DbMessage {
     reply_to: Option<String>,
     delivery_mode: Option<i32>,
     _priority: Option<i32>,
+    content_type: Option<String>,
+    content_encoding: Option<String>,
 }
 
 async fn send_msg(
@@ -625,6 +641,12 @@ async fn send_msg(
     }
     if let Some(priority) = message._priority {
         properties = properties.with_priority(priority as u8);
+    }
+    if let Some(content_type) = message.content_type {
+        properties = properties.with_content_type(ShortString::from(content_type));
+    }
+    if let Some(content_encoding) = message.content_encoding {
+        properties = properties.with_content_encoding(ShortString::from(content_encoding));
     }
     sender
         .send(AMQPFrame::Header(
@@ -651,7 +673,7 @@ async fn send_msg(
 
 async fn get_db_message(conn: &PgPool, queue_name: &str) -> Result<DbMessage, sqlx::Error> {
     sqlx::query_as!(DbMessage,
-        "SELECT message.id as id, message.arguments, body, exc._name as exchange, routing_key, correlation_id, reply_to, delivery_mode, _priority FROM message JOIN exchange exc ON exc.id = message.exchange_id WHERE queue_id IN (SELECT id FROM queue WHERE _name = $1) AND consumed_at IS NULL ORDER by recieved_at LIMIT 1"
+        "SELECT message.id as id, message.arguments, body, exc._name as exchange, routing_key, correlation_id, reply_to, delivery_mode, _priority, content_type, content_encoding FROM message JOIN exchange exc ON exc.id = message.exchange_id WHERE queue_id IN (SELECT id FROM queue WHERE _name = $1) AND consumed_at IS NULL ORDER by recieved_at LIMIT 1"
         , queue_name)
         .fetch_one(conn)
         .await
