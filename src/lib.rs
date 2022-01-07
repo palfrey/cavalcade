@@ -1,7 +1,10 @@
 use amq_protocol::{
     frame::{AMQPContentHeader, AMQPFrame, ProtocolVersion, WriteContext},
     protocol::{
-        basic::{AMQPMethod as BasicMethods, AMQPProperties, CancelOk, ConsumeOk, Deliver, QosOk},
+        basic::{
+            AMQPMethod as BasicMethods, AMQPProperties, CancelOk, ConsumeOk, Deliver, GetEmpty,
+            GetOk, QosOk,
+        },
         channel::{AMQPMethod as ChanMethods, CloseOk as ChanCloseOk, OpenOk as ChanOpenOk},
         connection::{
             AMQPMethod as ConnMethods, CloseOk as ConnCloseOk, OpenOk as ConnOpenOk, Start, Tune,
@@ -506,6 +509,39 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             })),
                         ))?;
                     }
+                    BasicMethods::Get(get) => {
+                        let queue_name = get.queue.to_string();
+                        let queue = sqlx::query!(
+                            "SELECT COUNT(id) as count FROM message WHERE queue_id IN (SELECT id FROM queue WHERE _name = $1)",
+                            queue_name
+                        )
+                        .fetch_one(&conn)
+                        .await
+                        .unwrap();
+                        match get_db_message(&conn, &queue_name).await {
+                            Ok(message) => {
+                                sender.send(AMQPFrame::Method(
+                                    channel,
+                                    AMQPClass::Basic(BasicMethods::GetOk(GetOk {
+                                        delivery_tag: 1,
+                                        redelivered: false,
+                                        exchange: ShortString::from(message.exchange.clone()),
+                                        routing_key: ShortString::from(
+                                            message.routing_key.as_ref().cloned().unwrap(),
+                                        ),
+                                        message_count: queue.count.unwrap() as u32,
+                                    })),
+                                ))?;
+                                send_msg(&conn, sender.clone(), channel, message).await;
+                            }
+                            Err(_) => {
+                                sender.send(AMQPFrame::Method(
+                                    channel,
+                                    AMQPClass::Basic(BasicMethods::GetEmpty(GetEmpty {})),
+                                ))?;
+                            }
+                        }
+                    }
                     _ => todo!(),
                 },
                 AMQPClass::Exchange(exchangemethod) => match exchangemethod {
@@ -555,6 +591,72 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
     Ok(())
 }
 
+struct DbMessage {
+    id: i32,
+    arguments: serde_json::Value,
+    body: Vec<u8>,
+    exchange: String,
+    routing_key: Option<String>,
+    correlation_id: Option<String>,
+    reply_to: Option<String>,
+    delivery_mode: Option<i32>,
+    _priority: Option<i32>,
+}
+
+async fn send_msg(
+    conn: &PgPool,
+    sender: UnboundedSender<AMQPFrame>,
+    channel: u16,
+    message: DbMessage,
+) {
+    let mut properties = AMQPProperties::default().with_headers(
+        serde_json::from_value::<BTreeMap<ShortString, AMQPValue>>(message.arguments)
+            .unwrap()
+            .into(),
+    );
+    if let Some(correlation_id) = message.correlation_id {
+        properties = properties.with_correlation_id(ShortString::from(correlation_id));
+    }
+    if let Some(reply_to) = message.reply_to {
+        properties = properties.with_reply_to(ShortString::from(reply_to));
+    }
+    if let Some(delivery_mode) = message.delivery_mode {
+        properties = properties.with_delivery_mode(delivery_mode as u8);
+    }
+    if let Some(priority) = message._priority {
+        properties = properties.with_priority(priority as u8);
+    }
+    sender
+        .send(AMQPFrame::Header(
+            channel,
+            60,
+            Box::new(AMQPContentHeader {
+                class_id: 60,
+                weight: 0,
+                body_size: message.body.len() as u64,
+                properties,
+            }),
+        ))
+        .unwrap();
+    sender.send(AMQPFrame::Body(channel, message.body)).unwrap();
+    sqlx::query!(
+        "UPDATE message SET consumed_by = $1, consumed_at = now() WHERE id = $2",
+        NODE_ID.deref(),
+        message.id
+    )
+    .execute(conn)
+    .await
+    .unwrap();
+}
+
+async fn get_db_message(conn: &PgPool, queue_name: &str) -> Result<DbMessage, sqlx::Error> {
+    sqlx::query_as!(DbMessage,
+        "SELECT message.id as id, message.arguments, body, exc._name as exchange, routing_key, correlation_id, reply_to, delivery_mode, _priority FROM message JOIN exchange exc ON exc.id = message.exchange_id WHERE queue_id IN (SELECT id FROM queue WHERE _name = $1) AND consumed_at IS NULL ORDER by recieved_at LIMIT 1"
+        , queue_name)
+        .fetch_one(conn)
+        .await
+}
+
 async fn delivery(
     conn: PgPool,
     sender: UnboundedSender<AMQPFrame>,
@@ -562,27 +664,20 @@ async fn delivery(
     queue_name: String,
     consumer_tag: String,
 ) {
-    let queue = sqlx::query!("SELECT id FROM queue WHERE _name = $1", queue_name)
-        .fetch_one(&conn)
-        .await
-        .unwrap();
-
     let mut delivery_tag: u64 = 1;
 
-    debug!(
-        "Delivery thread for {} ({}), {}",
-        queue_name, queue.id, consumer_tag
-    );
+    debug!("Delivery thread for {}, {}", queue_name, consumer_tag);
 
     let consumer_tag_ss = ShortString::from(consumer_tag);
 
     loop {
-        let possible = sqlx::query!(
-            "SELECT id, arguments, body, routing_key, correlation_id, reply_to, delivery_mode, _priority FROM message WHERE queue_id = $1 AND consumed_at IS NULL ORDER by recieved_at LIMIT 1"
-            , queue.id)
-            .fetch_one(&conn)
-            .await;
+        let possible = get_db_message(&conn, &queue_name).await;
         if let Ok(message) = possible {
+            let routing_key = message
+                .routing_key
+                .as_ref()
+                .cloned()
+                .unwrap_or_else(|| String::from(""));
             sender
                 .send(AMQPFrame::Method(
                     channel,
@@ -590,52 +685,13 @@ async fn delivery(
                         consumer_tag: consumer_tag_ss.clone(),
                         delivery_tag,
                         redelivered: false,
-                        exchange: ShortString::from(""), // FIXME correct value
-                        routing_key: ShortString::from(
-                            message.routing_key.unwrap_or_else(|| String::from("")),
-                        ),
+                        exchange: ShortString::from(message.exchange.clone()),
+                        routing_key: ShortString::from(routing_key.clone()),
                     })),
                 ))
                 .unwrap();
-            let mut properties = AMQPProperties::default().with_headers(
-                serde_json::from_value::<BTreeMap<ShortString, AMQPValue>>(message.arguments)
-                    .unwrap()
-                    .into(),
-            );
-            if let Some(correlation_id) = message.correlation_id {
-                properties = properties.with_correlation_id(ShortString::from(correlation_id));
-            }
-            if let Some(reply_to) = message.reply_to {
-                properties = properties.with_reply_to(ShortString::from(reply_to));
-            }
-            if let Some(delivery_mode) = message.delivery_mode {
-                properties = properties.with_delivery_mode(delivery_mode as u8);
-            }
-            if let Some(priority) = message._priority {
-                properties = properties.with_priority(priority as u8);
-            }
-            sender
-                .send(AMQPFrame::Header(
-                    channel,
-                    60,
-                    Box::new(AMQPContentHeader {
-                        class_id: 60,
-                        weight: 0,
-                        body_size: message.body.len() as u64,
-                        properties,
-                    }),
-                ))
-                .unwrap();
-            sender.send(AMQPFrame::Body(channel, message.body)).unwrap();
+            send_msg(&conn, sender.clone(), channel, message).await;
             delivery_tag += 1;
-            sqlx::query!(
-                "UPDATE message SET consumed_by = $1, consumed_at = now() WHERE id = $2",
-                NODE_ID.deref(),
-                message.id
-            )
-            .execute(&conn)
-            .await
-            .unwrap();
         } else {
             time::sleep(Duration::from_secs(1)).await;
         }
