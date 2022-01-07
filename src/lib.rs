@@ -326,7 +326,7 @@ async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
     .fetch_all(conn)
     .await
     .unwrap();
-    if exchange._type == "topic" {
+    if exchange._type == "topic" || exchange._type == "direct" {
         for bind in binds {
             // * (star) can substitute for exactly one word.
             // # (hash) can substitute for zero or more words.
