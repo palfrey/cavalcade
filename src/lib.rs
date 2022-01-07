@@ -693,6 +693,7 @@ async fn delivery(
     let consumer_tag_ss = ShortString::from(consumer_tag);
 
     loop {
+        let tx = conn.begin().await.unwrap();
         let possible = get_db_message(&conn, &queue_name).await;
         if let Ok(message) = possible {
             let routing_key = message
@@ -714,7 +715,9 @@ async fn delivery(
                 .unwrap();
             send_msg(&conn, sender.clone(), channel, message).await;
             delivery_tag += 1;
+            tx.commit().await.unwrap();
         } else {
+            tx.rollback().await.unwrap();
             time::sleep(Duration::from_secs(1)).await;
         }
     }
