@@ -36,9 +36,15 @@ if __name__ == "__main__":
     res = hello.delay()
     print("hello", res)
 
-    while True:
-        print("res", res.ready())
+    ok = False
+    for _ in range(10):
+        status = res.ready()
+        print("res", status)
+        if status:
+            ok = True
+            break
         time.sleep(1)
 
     assert ct.is_alive()
     assert app.configured
+    assert ok
