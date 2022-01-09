@@ -180,6 +180,47 @@ fn fieldtable_to_json(table: &FieldTable) -> serde_json::Value {
     serde_json::to_value(table.inner()).unwrap()
 }
 
+async fn dump_dot(conn: &PgPool) {
+    println!("digraph binds {{");
+    sqlx::query!("SELECT _name FROM queue")
+        .fetch_all(conn)
+        .await
+        .unwrap()
+        .into_iter()
+        .for_each(|r| {
+            println!(
+                "Q_{}[label=\"Q: {}\"]",
+                r._name
+                    .replace("-", "_")
+                    .replace(".", "_")
+                    .replace("@", "_"),
+                r._name
+            )
+        });
+    sqlx::query!("SELECT _name FROM exchange")
+        .fetch_all(conn)
+        .await
+        .unwrap()
+        .into_iter()
+        .for_each(|r| {
+            println!(
+                "E_{}[label=\"E: {}\"]",
+                r._name
+                    .replace("-", "_")
+                    .replace(".", "_")
+                    .replace("@", "_"),
+                r._name
+            )
+        });
+    sqlx::query!("SELECT routing_key, queue._name as q_name, exchange._name as e_name FROM bind JOIN queue ON queue.id = queue_id JOIN exchange ON exchange.id = exchange_id")        
+        .fetch_all(conn)
+        .await
+        .unwrap()
+        .into_iter()
+        .for_each(|r| println!("E_{} -> Q_{}[label=\"{}\"]", r.e_name.replace("-", "_").replace(".", "_").replace("@", "_"), r.q_name.replace("-", "_").replace(".", "_").replace("@", "_"), r.routing_key));
+    println!("}}");
+}
+
 async fn store_queue(conn: &PgPool, declare: &QueueDeclare) {
     let queue_name = declare.queue.to_string();
     let existing_queues = sqlx::query!("SELECT id FROM queue WHERE _name = $1", &queue_name)
@@ -203,6 +244,7 @@ async fn store_queue(conn: &PgPool, declare: &QueueDeclare) {
         declare.passive,
         declare.durable,
         declare.exclusive, declare.auto_delete, declare.nowait, fieldtable_to_json(&declare.arguments)).execute(conn).await.unwrap();
+        dump_dot(conn).await;
     }
 }
 
@@ -231,6 +273,7 @@ async fn store_exchange(conn: &PgPool, declare: &ExchangeDeclare) {
         declare.passive,
         declare.durable,
         declare.auto_delete, declare.nowait, fieldtable_to_json(&declare.arguments)).execute(conn).await.unwrap();
+        dump_dot(conn).await;
     }
 }
 
@@ -269,6 +312,7 @@ async fn store_bind(conn: &PgPool, bind: &Bind) {
             routing_key,
             bind.nowait,
             fieldtable_to_json(&bind.arguments)).execute(conn).await.unwrap();
+        dump_dot(conn).await;
     }
 }
 
@@ -492,6 +536,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                         ))?;
                     }
                     BasicMethods::Consume(consume) => {
+                        debug_assert_ne!(consume.consumer_tag.to_string().is_empty(), true);
                         tokio::spawn(delivery(
                             conn.clone(),
                             sender.clone(),

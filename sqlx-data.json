@@ -1,5 +1,23 @@
 {
   "db": "PostgreSQL",
+  "0d57ab36af89e7e26dc608afb0d1aadf7866435a617043c2d2503e1c42dd6385": {
+    "query": "SELECT _name FROM queue",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "_name",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "338326815b0ff37bda1159cb253334a5f7fa054bfbf3f744e2942ee362194049": {
     "query": "SELECT id FROM exchange WHERE _name = $1",
     "describe": {
@@ -173,6 +191,36 @@
       "nullable": []
     }
   },
+  "99f8f164d568cda578b743f7fc14fef568bff9ed29ba0b706babc1fa073a3dc8": {
+    "query": "SELECT routing_key, queue._name as q_name, exchange._name as e_name FROM bind JOIN queue ON queue.id = queue_id JOIN exchange ON exchange.id = exchange_id",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "routing_key",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "q_name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "e_name",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "9d0930e105442800649bc4f8e354115a5b0b2f87ceed504085ba4e9a4837f823": {
     "query": "\n            UPDATE exchange SET passive = $1, durable = $2, auto_delete = $3, _nowait = $4, arguments = $5\n            WHERE id = $6",
     "describe": {
@@ -188,6 +236,24 @@
         ]
       },
       "nullable": []
+    }
+  },
+  "b3ebca91bd76182474a6b5329f98064c8fe4e40f4bfc5e52292e04d76622dacc": {
+    "query": "SELECT _name FROM exchange",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "_name",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false
+      ]
     }
   },
   "c3d49af370ec5efc0c6cc0a964e7babea779d8b3810bb6f9c0eb61f018e6ddec": {
