@@ -25,7 +25,7 @@ use anyhow::{bail, Result};
 use chrono::Utc;
 use dotenv::dotenv;
 use lazy_static::lazy_static;
-use log::{debug, info};
+use log::{debug, info, error};
 use regex::{bytes::Regex as BytesRegex, Regex};
 use sqlx::PgPool;
 use std::{borrow::Cow, collections::BTreeMap, env, fs, ops::Deref, time::Duration};
@@ -371,6 +371,7 @@ async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
     .fetch_all(conn)
     .await
     .unwrap();
+    let mut stores: u32 = 0;
     if exchange._type == "topic" || exchange._type == "direct" {
         for bind in binds {
             // * (star) can substitute for exactly one word.
@@ -383,14 +384,19 @@ async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
             .unwrap();
             if pattern.is_match(routing_key) {
                 insert_into_queue_name(conn, &bind.queue_name, message, &content).await;
+                stores += 1;
             }
         }
     } else if exchange._type == "fanout" {
         for bind in binds {
             insert_into_queue_name(conn, &bind.queue_name, message, &content).await;
+            stores += 1;
         }
     } else {
         panic!("{:?}", exchange);
+    }
+    if stores == 0 {
+        error!("Message sent nowhere!");
     }
 }
 
