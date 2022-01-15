@@ -69,6 +69,7 @@ jobs:
         steps:
             - uses: actions/checkout@v2.3.4
             - uses: satackey/action-docker-layer-caching@v0.0.11
+              continue-on-error: true
             - name: Run test-celery
               run: |-
                   set -euo pipefail
@@ -87,6 +88,7 @@ jobs:
         steps:
             - uses: actions/checkout@v2.3.4
             - uses: satackey/action-docker-layer-caching@v0.0.11
+              continue-on-error: true
             - name: Run test-celery
               run: |-
                   set -euo pipefail
