@@ -368,6 +368,28 @@
       "nullable": []
     }
   },
+  "da24f0a107b4394e33d627905fd232ffae2b6b86158e88b361b0d29567a2636a": {
+    "query": "INSERT INTO message (id, arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to, content_type, content_encoding) VALUES(gen_random_uuid(), $1, $2, (SELECT id from queue WHERE _name = $3), $4, NULL, NULL, $5, NULL, $6, $7, $8, $9, $10, $11)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Jsonb",
+          "Bytea",
+          "Text",
+          "Timestamp",
+          "Varchar",
+          "Int4",
+          "Int4",
+          "Varchar",
+          "Varchar",
+          "Varchar",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "de17f5e8ce55ac9bd982ce89ce19cf61d15228f1799d241956834fe90e2f5ad3": {
     "query": "UPDATE message SET consumed_by = $1, consumed_at = now() WHERE id = $2",
     "describe": {

@@ -181,6 +181,7 @@ fn fieldtable_to_json(table: &FieldTable) -> serde_json::Value {
 }
 
 async fn dump_dot(conn: &PgPool) {
+    return;
     println!("digraph binds {{");
     sqlx::query!("SELECT _name FROM queue")
         .fetch_all(conn)
@@ -343,10 +344,21 @@ async fn insert_into_queue_name(
     message: &Message,
     content: &[u8],
 ) {
-    debug!("Inserting message into queue {}", queue_name);
-    sqlx::query!(
-        "INSERT INTO message (id, arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to, content_type, content_encoding) VALUES(gen_random_uuid(), $1, $2, (SELECT id from queue WHERE _name = $3), $4, NULL, NULL, $5, (SELECT id from exchange WHERE _name = $6), $7, $8, $9, $10, $11, $12)",
-    message.headers, content, queue_name, Utc::now().naive_utc(), message.routing_key, message.exchange, message.delivery_mode.map(|x| x as i32), message.priority.map(|x| x as i32), message.correlation_id, message.reply_to, message.content_type, message.content_encoding).execute(conn).await.unwrap();
+    if message.exchange.as_ref().unwrap().is_empty() {
+        debug!("Inserting no-exchange message into queue {}", queue_name);
+        sqlx::query!(
+            "INSERT INTO message (id, arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to, content_type, content_encoding) VALUES(gen_random_uuid(), $1, $2, (SELECT id from queue WHERE _name = $3), $4, NULL, NULL, $5, NULL, $6, $7, $8, $9, $10, $11)",
+        message.headers, content, queue_name, Utc::now().naive_utc(), message.routing_key, message.delivery_mode.map(|x| x as i32), message.priority.map(|x| x as i32), message.correlation_id, message.reply_to, message.content_type, message.content_encoding).execute(conn).await.unwrap();
+    } else {
+        debug!(
+            "Inserting message into queue {} from {}",
+            queue_name,
+            message.exchange.as_ref().unwrap()
+        );
+        sqlx::query!(
+            "INSERT INTO message (id, arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to, content_type, content_encoding) VALUES(gen_random_uuid(), $1, $2, (SELECT id from queue WHERE _name = $3), $4, NULL, NULL, $5, (SELECT id from exchange WHERE _name = $6), $7, $8, $9, $10, $11, $12)",
+        message.headers, content, queue_name, Utc::now().naive_utc(), message.routing_key, message.exchange, message.delivery_mode.map(|x| x as i32), message.priority.map(|x| x as i32), message.correlation_id, message.reply_to, message.content_type, message.content_encoding).execute(conn).await.unwrap();
+    }
 }
 
 async fn store_message(conn: &PgPool, message: &Message, content: Vec<u8>) {
@@ -610,6 +622,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             }
                         }
                     }
+                    BasicMethods::Reject(reject) => {}
                     _ => todo!("No implementation for {:?}", basicmethod),
                 },
                 AMQPClass::Exchange(exchangemethod) => match exchangemethod {
