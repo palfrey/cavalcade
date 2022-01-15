@@ -181,7 +181,6 @@ fn fieldtable_to_json(table: &FieldTable) -> serde_json::Value {
 }
 
 async fn dump_dot(conn: &PgPool) {
-    return;
     println!("digraph binds {{");
     sqlx::query!("SELECT _name FROM queue")
         .fetch_all(conn)
@@ -622,7 +621,6 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             }
                         }
                     }
-                    BasicMethods::Reject(reject) => {}
                     _ => todo!("No implementation for {:?}", basicmethod),
                 },
                 AMQPClass::Exchange(exchangemethod) => match exchangemethod {
