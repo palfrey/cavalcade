@@ -542,7 +542,6 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                         ))?;
                     }
                     BasicMethods::Consume(consume) => {
-                        debug_assert!(consume.consumer_tag.to_string().is_empty());
                         tokio::spawn(delivery(
                             conn.clone(),
                             sender.clone(),
