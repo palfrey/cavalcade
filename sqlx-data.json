@@ -38,6 +38,36 @@
       ]
     }
   },
+  "46c2ab3942516ea092d0f033e408bd5d18bb56db420f11d4b2f854d4ef6cc2ff": {
+    "query": "SELECT routing_key, queue._name as \"q_name!\", exchange._name as \"e_name!\" FROM bind JOIN queue ON queue.id = queue_id JOIN exchange ON exchange.id = exchange_id",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "routing_key",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "q_name!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "e_name!",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        true,
+        true,
+        true
+      ]
+    }
+  },
   "4e43517af153a0d1cc5f364e6e417e7e35efafe35b2281ae78ffb83868f96100": {
     "query": "INSERT INTO bind (id, queue_id, exchange_id, routing_key, _nowait, arguments) VALUES(gen_random_uuid(), (SELECT id FROM queue WHERE _name = $1), (SELECT id FROM exchange WHERE _name = $2), $3, $4, $5)",
     "describe": {
@@ -189,36 +219,6 @@
         ]
       },
       "nullable": []
-    }
-  },
-  "99f8f164d568cda578b743f7fc14fef568bff9ed29ba0b706babc1fa073a3dc8": {
-    "query": "SELECT routing_key, queue._name as q_name, exchange._name as e_name FROM bind JOIN queue ON queue.id = queue_id JOIN exchange ON exchange.id = exchange_id",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "routing_key",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 1,
-          "name": "q_name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 2,
-          "name": "e_name",
-          "type_info": "Varchar"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false
-      ]
     }
   },
   "9d0930e105442800649bc4f8e354115a5b0b2f87ceed504085ba4e9a4837f823": {

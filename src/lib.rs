@@ -212,12 +212,12 @@ async fn dump_dot(conn: &PgPool) {
                 r._name
             )
         });
-    sqlx::query!("SELECT routing_key, queue._name as q_name, exchange._name as e_name FROM bind JOIN queue ON queue.id = queue_id JOIN exchange ON exchange.id = exchange_id")        
+    sqlx::query!("SELECT routing_key, queue._name as \"q_name!\", exchange._name as \"e_name!\" FROM bind JOIN queue ON queue.id = queue_id JOIN exchange ON exchange.id = exchange_id")        
         .fetch_all(conn)
         .await
         .unwrap()
         .into_iter()
-        .for_each(|r| println!("E_{} -> Q_{}[label=\"{}\"]", r.e_name.replace("-", "_").replace(".", "_").replace("@", "_"), r.q_name.replace("-", "_").replace(".", "_").replace("@", "_"), r.routing_key));
+        .for_each(|r| println!("E_{} -> Q_{}[label=\"{:?}\"]", r.e_name.replace("-", "_").replace(".", "_").replace("@", "_"), r.q_name.replace("-", "_").replace(".", "_").replace("@", "_"), r.routing_key));
     println!("}}");
 }
 
@@ -542,7 +542,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                         ))?;
                     }
                     BasicMethods::Consume(consume) => {
-                        debug_assert_ne!(consume.consumer_tag.to_string().is_empty(), true);
+                        debug_assert!(consume.consumer_tag.to_string().is_empty());
                         tokio::spawn(delivery(
                             conn.clone(),
                             sender.clone(),
