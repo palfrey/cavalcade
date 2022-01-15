@@ -748,7 +748,7 @@ async fn send_msg(
 
 async fn get_db_message(conn: &PgPool, queue_name: &str) -> Result<DbMessage, sqlx::Error> {
     sqlx::query_as!(DbMessage,
-        "SELECT message.id as id, message.arguments, body, exc._name as exchange, routing_key, correlation_id, reply_to, delivery_mode, _priority, content_type, content_encoding FROM message JOIN exchange exc ON exc.id = message.exchange_id WHERE queue_id IN (SELECT id FROM queue WHERE _name = $1) AND consumed_at IS NULL ORDER by recieved_at LIMIT 1"
+        "SELECT message.id as id, message.arguments, body, exc._name as exchange, routing_key, correlation_id, reply_to, delivery_mode, _priority, content_type, content_encoding FROM message LEFT JOIN exchange exc ON exc.id = message.exchange_id WHERE queue_id IN (SELECT id FROM queue WHERE _name = $1) AND consumed_at IS NULL ORDER by recieved_at LIMIT 1"
         , queue_name)
         .fetch_one(conn)
         .await
