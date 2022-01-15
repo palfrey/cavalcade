@@ -25,7 +25,7 @@ use anyhow::{bail, Result};
 use chrono::Utc;
 use dotenv::dotenv;
 use lazy_static::lazy_static;
-use log::{debug, info, error};
+use log::{debug, error, info};
 use regex::{bytes::Regex as BytesRegex, Regex};
 use sqlx::PgPool;
 use std::{borrow::Cow, collections::BTreeMap, env, fs, ops::Deref, time::Duration};
@@ -450,7 +450,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                 AMQPClass::Connection(connmethod) => match connmethod {
                     ConnMethods::StartOk(start_ok) => {
                         if start_ok.mechanism != ShortString::from("PLAIN") {
-                            todo!();
+                            todo!("Unknown auth mechanism: {}", start_ok.mechanism);
                         }
                         lazy_static! {
                             static ref NULL_SPLIT: BytesRegex = BytesRegex::new("\u{0}").unwrap();
@@ -490,7 +490,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             ))?;
                         }
                     }
-                    _ => todo!(),
+                    _ => todo!("No implementation for {:?}", connmethod),
                 },
                 AMQPClass::Channel(chanmethod) => match chanmethod {
                     ChanMethods::Open(_open) => {
@@ -505,7 +505,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             AMQPClass::Channel(ChanMethods::CloseOk(ChanCloseOk {})),
                         ))?;
                     }
-                    _ => todo!(),
+                    _ => todo!("No implementation for {:?}", chanmethod),
                 },
                 AMQPClass::Queue(queuemethod) => match queuemethod {
                     QueueMethods::Declare(declare) => {
@@ -526,7 +526,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             AMQPClass::Queue(QueueMethods::BindOk(QueueBindOk {})),
                         ))?;
                     }
-                    _ => todo!(),
+                    _ => todo!("No implementation for {:?}", queuemethod),
                 },
                 AMQPClass::Basic(basicmethod) => match basicmethod {
                     BasicMethods::Publish(publish) => {
@@ -598,7 +598,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             }
                         }
                     }
-                    _ => todo!(),
+                    _ => todo!("No implementation for {:?}", basicmethod),
                 },
                 AMQPClass::Exchange(exchangemethod) => match exchangemethod {
                     ExchangeMethods::Bind(_bind) => {}
@@ -610,9 +610,9 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             AMQPClass::Exchange(ExchangeMethods::DeclareOk(ExchangeDeclareOk {})),
                         ))?;
                     }
-                    _ => todo!(),
+                    _ => todo!("No implementation for {:?}", exchangemethod),
                 },
-                _ => todo!(),
+                _ => todo!("No implementation for {:?}", method),
             },
             AMQPFrame::Header(_channel, _class_id, content) => {
                 assert_ne!(current_message.kind, MessageType::Nothing);
