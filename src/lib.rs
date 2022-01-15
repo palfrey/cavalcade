@@ -426,7 +426,20 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
         content_encoding: None,
     };
 
-    while let Some(frame) = connection.read_frame().await.unwrap() {
+    loop {
+        let frame = match connection.read_frame().await {
+            Ok(val) => match val {
+                Some(frame) => frame,
+                None => {
+                    error!("No frame, so assume disconnect");
+                    break;
+                }
+            },
+            Err(err) => {
+                error!("Error getting frame, assuming disconnect: {}", err);
+                break;
+            }
+        };
         debug!("Input Frame: {:?}", frame);
         match frame {
             AMQPFrame::ProtocolHeader(version) => {
