@@ -17,3 +17,11 @@ repos:
       rev: v1.0.7
       hooks:
           - id: cargo-sort
+    - repo: local
+      hooks:
+          - id: sqlx-check
+            name: Check sqlx-data
+            entry: cargo sqlx prepare --check -- --lib
+            language: system
+            types: [rust]
+            pass_filenames: false

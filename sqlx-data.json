@@ -1,5 +1,302 @@
 {
   "db": "PostgreSQL",
+  "0d57ab36af89e7e26dc608afb0d1aadf7866435a617043c2d2503e1c42dd6385": {
+    "query": "SELECT _name FROM queue",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "_name",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
+  "1b09443a855fc883de8af051da48e9a4f7ac5e769889ff10624b5ed4565b9d36": {
+    "query": "SELECT message.id as id, message.arguments, body, exc._name as \"exchange?\", routing_key, correlation_id, reply_to, delivery_mode, _priority, content_type, content_encoding FROM message LEFT JOIN exchange exc ON exc.id = message.exchange_id WHERE queue_id IN (SELECT id FROM queue WHERE _name = $1) AND consumed_at IS NULL ORDER BY recieved_at LIMIT 1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "arguments",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 2,
+          "name": "body",
+          "type_info": "Bytea"
+        },
+        {
+          "ordinal": 3,
+          "name": "exchange?",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "routing_key",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "correlation_id",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 6,
+          "name": "reply_to",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 7,
+          "name": "delivery_mode",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 8,
+          "name": "_priority",
+          "type_info": "Int4"
+        },
+        {
+          "ordinal": 9,
+          "name": "content_type",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 10,
+          "name": "content_encoding",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  },
+  "21cf1426c46f819f5c0bd9c6751e5d09e43d5f4df39c2c9c9b853a01b327d9e5": {
+    "query": "UPDATE message SET delivery_tag = nextval('delivery_tag_seq') WHERE id = $1 RETURNING delivery_tag",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "delivery_tag",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        true
+      ]
+    }
+  },
+  "338326815b0ff37bda1159cb253334a5f7fa054bfbf3f744e2942ee362194049": {
+    "query": "SELECT id FROM exchange WHERE _name = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
+  "46c2ab3942516ea092d0f033e408bd5d18bb56db420f11d4b2f854d4ef6cc2ff": {
+    "query": "SELECT routing_key, queue._name as \"q_name!\", exchange._name as \"e_name!\" FROM bind JOIN queue ON queue.id = queue_id JOIN exchange ON exchange.id = exchange_id",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "routing_key",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "q_name!",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "e_name!",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        true,
+        true,
+        true
+      ]
+    }
+  },
+  "494c0e49c3583f76d6a96d0ad7905306d5a6de5210f420a81bace81afec7a77b": {
+    "query": "DELETE FROM message WHERE delivery_tag = $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "4e43517af153a0d1cc5f364e6e417e7e35efafe35b2281ae78ffb83868f96100": {
+    "query": "INSERT INTO bind (id, queue_id, exchange_id, routing_key, _nowait, arguments) VALUES(gen_random_uuid(), (SELECT id FROM queue WHERE _name = $1), (SELECT id FROM exchange WHERE _name = $2), $3, $4, $5)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Varchar",
+          "Bool",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "5124ded66e489de609dbd749fe0c2ece8f85441b6eac8f5050fcb6a55b159b6e": {
+    "query": "INSERT INTO message (id, arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to, content_type, content_encoding) VALUES(gen_random_uuid(), $1, $2, (SELECT id from queue WHERE _name = $3), $4, NULL, NULL, $5, (SELECT id from exchange WHERE _name = $6), $7, $8, $9, $10, $11, $12)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Jsonb",
+          "Bytea",
+          "Text",
+          "Timestamp",
+          "Varchar",
+          "Text",
+          "Int4",
+          "Int4",
+          "Varchar",
+          "Varchar",
+          "Varchar",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "51bf56064519c902b7fbf91382fa78646f5542bd99793d2bd56d8da254e525db": {
+    "query": "SELECT COUNT(id) as count FROM message WHERE queue_id IN (SELECT id FROM queue WHERE _name = $1)",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "count",
+          "type_info": "Int8"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        null
+      ]
+    }
+  },
+  "55c797db1549c5f9fa0f1528f1d7b9f84e1e3f23cc98b785f148490676679805": {
+    "query": "SELECT bind.id as id, queue._name as queue_name, routing_key FROM bind JOIN queue ON queue.id = queue_id WHERE exchange_id = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "queue_name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 2,
+          "name": "routing_key",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "62c76ddd7c04b7249394d5020ad4c75265bf8053acacc9bd78c3ddd9b80bf360": {
+    "query": "SELECT id, _type FROM exchange WHERE _name = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "_type",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false
+      ]
+    }
+  },
   "62f00c31fc32a41134d2c8733db528f5043be40ac2768d8d087ffc13d0537e9a": {
     "query": "\n            UPDATE queue SET passive = $1, durable = $2, _exclusive = $3, auto_delete = $4, _nowait = $5, arguments = $6\n            WHERE id = $7",
     "describe": {
@@ -12,14 +309,93 @@
           "Bool",
           "Bool",
           "Jsonb",
-          "Int4"
+          "Uuid"
         ]
       },
       "nullable": []
     }
   },
-  "6828d73857df6f9ea5db5753ad164b8ce935ce14996c7d650ee08a941a0f3f89": {
-    "query": "INSERT INTO queue (_name, passive, durable, _exclusive, auto_delete, _nowait, arguments) VALUES($1, $2, $3, $4, $5, $6, $7)",
+  "8a626bc06d292473557a66b7f473a646ff61c870885b5d4b87a848c80e32e289": {
+    "query": "INSERT INTO exchange (id, _name, _type, passive, durable, auto_delete, _nowait, arguments) VALUES(gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Varchar",
+          "Bool",
+          "Bool",
+          "Bool",
+          "Bool",
+          "Jsonb"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "9d0930e105442800649bc4f8e354115a5b0b2f87ceed504085ba4e9a4837f823": {
+    "query": "\n            UPDATE exchange SET passive = $1, durable = $2, auto_delete = $3, _nowait = $4, arguments = $5\n            WHERE id = $6",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bool",
+          "Bool",
+          "Bool",
+          "Bool",
+          "Jsonb",
+          "Uuid"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "b3ebca91bd76182474a6b5329f98064c8fe4e40f4bfc5e52292e04d76622dacc": {
+    "query": "SELECT _name FROM exchange",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "_name",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
+  "b7c482125259ca09a29a01b91c090e25d33290544c39972a95c64dd00ab4211e": {
+    "query": "UPDATE message SET consumed_at = NULL, consumed_by = NULL WHERE delivery_tag = $1",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Int8"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "c9dacc8452436daeaf9f2faaddfa4496512cba917bbc3597e8151d589f7b9d00": {
+    "query": "\n            UPDATE bind SET _nowait = $1, arguments = $2\n            WHERE id = $3",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Bool",
+          "Jsonb",
+          "Uuid"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "d042484c30d6ef7629d698f535c83d6a4d85e3061925895d48ff3ec31e48b4a4": {
+    "query": "INSERT INTO queue (id, _name, passive, durable, _exclusive, auto_delete, _nowait, arguments) VALUES(gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7)",
     "describe": {
       "columns": [],
       "parameters": {
@@ -36,6 +412,63 @@
       "nullable": []
     }
   },
+  "da24f0a107b4394e33d627905fd232ffae2b6b86158e88b361b0d29567a2636a": {
+    "query": "INSERT INTO message (id, arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to, content_type, content_encoding) VALUES(gen_random_uuid(), $1, $2, (SELECT id from queue WHERE _name = $3), $4, NULL, NULL, $5, NULL, $6, $7, $8, $9, $10, $11)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Jsonb",
+          "Bytea",
+          "Text",
+          "Timestamp",
+          "Varchar",
+          "Int4",
+          "Int4",
+          "Varchar",
+          "Varchar",
+          "Varchar",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "de17f5e8ce55ac9bd982ce89ce19cf61d15228f1799d241956834fe90e2f5ad3": {
+    "query": "UPDATE message SET consumed_by = $1, consumed_at = now() WHERE id = $2",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Uuid"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "df1f3974b92d8b44658b2ad090ac8c954b13fb271afa101568c05482134ea4bf": {
+    "query": "SELECT id FROM bind WHERE \n            queue_id IN (SELECT id FROM queue where _name = $1) AND\n            exchange_id IN (SELECT id from exchange where _name = $2) AND\n            routing_key = $3",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "f814486e9aa19d0e8f857b88677e53d5e364270aae5f0dfbbf7c8f319e65901a": {
     "query": "SELECT id FROM queue WHERE _name = $1",
     "describe": {
@@ -43,7 +476,7 @@
         {
           "ordinal": 0,
           "name": "id",
-          "type_info": "Int4"
+          "type_info": "Uuid"
         }
       ],
       "parameters": {

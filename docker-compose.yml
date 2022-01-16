@@ -22,4 +22,4 @@ services:
             dockerfile: Dockerfile.celery_test
         environment:
             AMQP_HOST: cavalcade
-        command: wait-for-it --host=cavalcade --port=5672 --timeout=0 --strict -- python test_tasks.py worker --loglevel=DEBUG
+        command: wait-for-it --host=cavalcade --port=5672 --timeout=0 --strict -- python test_tasks.py worker --loglevel=DEBUG --without-heartbeat

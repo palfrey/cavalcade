@@ -13,7 +13,7 @@ RUN cargo build
 RUN rm src/* -rf
 
 COPY src/ /work/src/
-COPY sqlx-data.json /work/
+COPY sqlx-data.json log4rs.yml /work/
 RUN cargo build
 COPY migrations/ /work/migrations/
 CMD ./target/debug/cavalcade

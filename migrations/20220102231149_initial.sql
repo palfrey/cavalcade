@@ -1,44 +1,57 @@
 CREATE TABLE queue (
-    id SERIAL PRIMARY KEY,
-    _name VARCHAR (256),
-    passive BOOLEAN,
-    durable BOOLEAN,
-    _exclusive BOOLEAN,
-    auto_delete BOOLEAN,
-    _nowait BOOLEAN,
-    arguments JSONB,
+    id UUID PRIMARY KEY,
+    _name VARCHAR (256) NOT NULL,
+    passive BOOLEAN NOT NULL,
+    durable BOOLEAN NOT NULL,
+    _exclusive BOOLEAN NOT NULL,
+    auto_delete BOOLEAN NOT NULL,
+    _nowait BOOLEAN NOT NULL,
+    arguments JSONB NOT NULL,
     UNIQUE(_name)
-);
-
-CREATE TABLE message (
-    id SERIAL PRIMARY KEY,
-    arguments JSONB,
-    body bytea,
-    queue_id INTEGER,
-    recieved_at TIMESTAMP,
-    consumed_at TIMESTAMP NULL,
-    consumed_by UUID NULL,
-    FOREIGN KEY (queue_id) REFERENCES queue (id)
 );
 
 CREATE TABLE exchange (
-    id SERIAL PRIMARY KEY,
-    _name VARCHAR (256),
-    passive BOOLEAN,
-    durable BOOLEAN,
-    auto_delete BOOLEAN,
-    _nowait BOOLEAN,
-    arguments JSONB,
+    id UUID PRIMARY KEY,
+    _name VARCHAR (256) NOT NULL,
+    _type VARCHAR(256) NOT NULL,
+    passive BOOLEAN NOT NULL,
+    durable BOOLEAN NOT NULL,
+    auto_delete BOOLEAN NOT NULL,
+    _nowait BOOLEAN NOT NULL,
+    arguments JSONB NOT NULL,
     UNIQUE(_name)
 );
 
+CREATE SEQUENCE delivery_tag_seq;
+
+CREATE TABLE message (
+    id UUID PRIMARY KEY,
+    arguments JSONB NOT NULL,
+    body bytea NOT NULL,
+    queue_id UUID NOT NULL,
+    recieved_at TIMESTAMP,
+    consumed_at TIMESTAMP NULL,
+    consumed_by UUID NULL,
+    delivery_mode INT4 NULL,
+    _priority INT4 NULL,
+    correlation_id VARCHAR(256),
+    reply_to VARCHAR(256),
+    exchange_id UUID NULL,
+    routing_key VARCHAR (256) NULL,
+    content_type VARCHAR(256) NULL,
+    content_encoding VARCHAR(256) NULL,
+    delivery_tag INT8 NULL,
+    FOREIGN KEY (exchange_id) REFERENCES exchange (id),
+    FOREIGN KEY (queue_id) REFERENCES queue (id)
+);
+
 CREATE TABLE bind (
-    id SERIAL PRIMARY KEY,
-    queue_id INTEGER,
-    exchange_id INTEGER,
-    routing_key VARCHAR (256),
-    _nowait BOOLEAN,
-    arguments JSONB,
+    id UUID PRIMARY KEY,
+    queue_id UUID NOT NULL,
+    exchange_id UUID NOT NULL,
+    routing_key VARCHAR (256) NOT NULL,
+    _nowait BOOLEAN NOT NULL,
+    arguments JSONB NOT NULL,
     FOREIGN KEY (queue_id) REFERENCES queue (id),
     FOREIGN KEY (exchange_id) REFERENCES exchange (id)
 );

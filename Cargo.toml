@@ -7,15 +7,18 @@ version = "0.1.0"
 amq-protocol = "6"
 anyhow = "1"
 bytes = "1"
+chrono = "0.4"
 dotenv = "0.15.0"
 lazy_static = "1"
 log = "0.4"
+log4rs = "1"
 regex = "1"
 serde = "1"
 serde_json = "*"
-simplelog = "0.11"
-sqlx = { version = "0.5", features = ["postgres", "runtime-tokio-rustls", "json", "offline"] }
+sqlx = { version = "0.5", features = ["postgres", "runtime-tokio-rustls", "json", "offline", "chrono", "uuid"] }
 tokio = { version = "1", features = ["net", "io-util", "rt", "macros", "rt-multi-thread"] }
+uuid = { version = "0.8", features = ["v4"] }
 
 [dev-dependencies]
 celery = "0.4.0-rcn.11"
+simplelog = "0.11"
