@@ -1,0 +1,17 @@
+---
+version: '3'
+services:
+    db:
+        image: postgres:13
+        ports:
+            - 5432:5432
+        environment:
+            POSTGRES_PASSWORD: password
+            POSTGRES_DB: cavalcade
+
+    cavalcade:
+        image: cavalcade
+        entrypoint: sh -c "/wait-for-db --mode postgres --connection-string postgres://postgres:password@db/cavalcade && /cavalcade --migrate --sqlx-path=/sqlx
+            && /cavalcade --help"
+        environment:
+            DATABASE_URL: postgres://postgres:password@db/cavalcade
