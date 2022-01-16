@@ -25,7 +25,7 @@ use anyhow::{bail, Result};
 use chrono::Utc;
 use dotenv::dotenv;
 use lazy_static::lazy_static;
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use regex::{bytes::Regex as BytesRegex, Regex};
 use sqlx::PgPool;
 use std::{borrow::Cow, collections::BTreeMap, env, fmt::Write, fs, ops::Deref, time::Duration};
@@ -143,7 +143,13 @@ impl ConnectionWriter {
         loop {
             let msg = self.receiver.recv().await;
             if let Some(frame) = msg {
-                self.write_frame(frame).await.unwrap();
+                match self.write_frame(frame).await {
+                    Ok(_) => {}
+                    Err(err) => {
+                        warn!("Error writing frame, so breaking: {}", err);
+                        break;
+                    }
+                }
             } else {
                 break;
             }
