@@ -133,4 +133,8 @@ jobs:
                     ldd cavalcade-linux-x64
                     echo Found local non-static refs!
                     exit 1
-                  fi                
+                  fi
+            - name: Run prod-test
+              run: docker-compose up --exit-code cavalcade
+              env:
+                  COMPOSE_FILE: docker-compose.prod.yml
