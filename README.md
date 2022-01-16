@@ -1,8 +1,8 @@
 Cavalcade
 =========
 [![Continuous integration](https://github.com/palfrey/cavalcade/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/palfrey/cavalcade/actions/workflows/ci.yml) 
-![Docker Pulls](https://img.shields.io/docker/pulls/palfrey/cavalcade)
-![Docker Image Version (latest semver)](https://img.shields.io/docker/v/palfrey/cavalcade)
+[![Docker Pulls](https://img.shields.io/docker/pulls/palfrey/cavalcade)](https://hub.docker.com/r/palfrey/cavalcade)
+[![Docker Image Version (latest semver)](https://img.shields.io/docker/v/palfrey/cavalcade)](https://hub.docker.com/r/palfrey/cavalcade)
 
 Cavalcade is an [AMQP broker](https://en.wikipedia.org/wiki/Advanced_Message_Queuing_Protocol) using a PostgreSQL-compatible database as a backing store. It can work with PostgreSQL itself, but is primarily targeted at distributed PostgreSQL-compatible databases (e.g. [CockroachDB](https://www.cockroachlabs.com/), [YugabyteDB](https://www.yugabyte.com/yugabytedb/)) to enable a multi-node AMQP setup.
 
