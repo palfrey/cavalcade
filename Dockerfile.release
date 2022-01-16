@@ -6,6 +6,14 @@ ENV PATH=$PATH:/root/.cargo/bin
 
 WORKDIR /app
 
+RUN wget https://github.com/palfrey/wait-for-db/releases/download/v1.2.0/wait-for-db-linux-x86 && chmod +x wait-for-db-linux-x86
+
+RUN cargo install sqlx-cli --no-default-features --features postgres,rustls --target=x86_64-unknown-linux-musl
+RUN strip /root/.cargo/bin/sqlx
+RUN file /root/.cargo/bin/sqlx
+RUN ls -lh /root/.cargo/bin/sqlx
+RUN ldd /root/.cargo/bin/sqlx
+
 # Creating a new dummy project
 RUN cargo init
 # Replacing with the desired dependencies
@@ -16,12 +24,16 @@ RUN cargo build --release --target=x86_64-unknown-linux-musl
 RUN rm src/* -rf
 
 ADD . ./
-ENV SQLX_OFFLINE=true
-RUN cargo build --release --target=x86_64-unknown-linux-musl
+RUN SQLX_OFFLINE=true cargo build --release --target=x86_64-unknown-linux-musl
 RUN strip ./target/x86_64-unknown-linux-musl/release/cavalcade
 RUN file ./target/x86_64-unknown-linux-musl/release/cavalcade
 RUN ls -lh ./target/x86_64-unknown-linux-musl/release/cavalcade
 
-FROM scratch
+FROM busybox:1.35.0-musl
 COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/cavalcade /cavalcade
+COPY --from=builder /root/.cargo/bin/sqlx /sqlx
+COPY --from=builder /app/wait-for-db-linux-x86 /wait-for-db
+RUN mkdir /migrations
+COPY --from=builder /app/migrations/* /migrations/
+COPY --from=builder /app/log4rs.prod.yml /log4rs.yml
 ENTRYPOINT ["/cavalcade"]
