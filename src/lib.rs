@@ -603,7 +603,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                                 sender.send(AMQPFrame::Method(
                                     channel,
                                     AMQPClass::Basic(BasicMethods::GetOk(GetOk {
-                                        delivery_tag: delivery_tag,
+                                        delivery_tag,
                                         redelivered: false,
                                         exchange: message
                                             .exchange
@@ -625,6 +625,23 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                                 ))?;
                             }
                         }
+                    }
+                    BasicMethods::Ack(ack) => {
+                        assert!(!ack.multiple, "Multiple set to true");
+                        assert_ne!(ack.delivery_tag, 0, "Zero delivery tag");
+                        sqlx::query!(
+                            "DELETE FROM message WHERE delivery_tag = $1",
+                            ack.delivery_tag as i64
+                        )
+                        .execute(&conn)
+                        .await
+                        .expect("DELETE message should work");
+                    }
+                    BasicMethods::Reject(reject) => {
+                        assert!(reject.requeue, "Expected a requeue");
+                        sqlx::query!("UPDATE message SET consumed_at = NULL, consumed_by = NULL WHERE delivery_tag = $1", reject.delivery_tag as i64).execute(&conn)
+                        .await
+                        .expect("UPDATE message for reject should work");
                     }
                     _ => todo!("No implementation for {:?}", basicmethod),
                 },
