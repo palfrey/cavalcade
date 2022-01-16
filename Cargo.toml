@@ -4,10 +4,11 @@ name = "cavalcade"
 version = "0.1.0"
 
 [dependencies]
-amq-protocol = "6"
+amq-protocol = { version = "6", features = ["rustls"], default_features = false }
 anyhow = "1"
 bytes = "1"
 chrono = "0.4"
+clap = { version = "3", default_features = false, features = ["cargo", "std"] }
 dotenv = "0.15.0"
 lazy_static = "1"
 log = "0.4"
