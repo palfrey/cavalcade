@@ -25,7 +25,7 @@ In all cases set `DATABASE_URL` to the URL for your database. Examples:
 
 Docker config:
 
-  1. Pick an image from https://quay.io/repository/palfrey/cavalcade?tab=tags
+  1. Pick an image from https://hub.docker.com/r/palfrey/cavalcade or https://quay.io/repository/palfrey/cavalcade?tab=tags
   2. (Optionally): Download the [standard logging config](https://github.com/palfrey/cavalcade/blob/main/log4rs.yml), customise as required and mount in the image as `/log4rs.yml`
   3. Run the migration helper, then the main app. e.g `sh -c "/cavalcade --migrate --sqlx-path=/sqlx && /cavalcade"`. The former should do nothing on nodes without changes, and the two steps can be split if wished.
 
