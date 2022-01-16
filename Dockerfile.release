@@ -35,4 +35,5 @@ COPY --from=builder /root/.cargo/bin/sqlx /sqlx
 COPY --from=builder /app/wait-for-db-linux-x86 /wait-for-db
 RUN mkdir /migrations
 COPY --from=builder /app/migrations/* /migrations/
+COPY --from=builder /app/log4rs.prod.yml /log4rs.yml
 ENTRYPOINT ["/cavalcade"]
