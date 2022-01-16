@@ -25,10 +25,10 @@ use anyhow::{bail, Result};
 use chrono::Utc;
 use dotenv::dotenv;
 use lazy_static::lazy_static;
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use regex::{bytes::Regex as BytesRegex, Regex};
 use sqlx::PgPool;
-use std::{borrow::Cow, collections::BTreeMap, env, fs, ops::Deref, time::Duration};
+use std::{borrow::Cow, collections::BTreeMap, env, fmt::Write, fs, ops::Deref, time::Duration};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{
@@ -181,14 +181,16 @@ fn fieldtable_to_json(table: &FieldTable) -> serde_json::Value {
 }
 
 async fn dump_dot(conn: &PgPool) {
-    println!("digraph binds {{");
+    let mut graph_string = String::default();
+    writeln!(graph_string, "digraph binds {{").unwrap();
     sqlx::query!("SELECT _name FROM queue")
         .fetch_all(conn)
         .await
         .unwrap()
         .into_iter()
         .for_each(|r| {
-            println!(
+            writeln!(
+                graph_string,
                 "Q_{}[label=\"Q: {}\"]",
                 r._name
                     .replace("-", "_")
@@ -196,6 +198,7 @@ async fn dump_dot(conn: &PgPool) {
                     .replace("@", "_"),
                 r._name
             )
+            .unwrap();
         });
     sqlx::query!("SELECT _name FROM exchange")
         .fetch_all(conn)
@@ -203,7 +206,8 @@ async fn dump_dot(conn: &PgPool) {
         .unwrap()
         .into_iter()
         .for_each(|r| {
-            println!(
+            writeln!(
+                graph_string,
                 "E_{}[label=\"E: {}\"]",
                 r._name
                     .replace("-", "_")
@@ -211,14 +215,16 @@ async fn dump_dot(conn: &PgPool) {
                     .replace("@", "_"),
                 r._name
             )
+            .unwrap();
         });
     sqlx::query!("SELECT routing_key, queue._name as \"q_name!\", exchange._name as \"e_name!\" FROM bind JOIN queue ON queue.id = queue_id JOIN exchange ON exchange.id = exchange_id")        
         .fetch_all(conn)
         .await
         .unwrap()
         .into_iter()
-        .for_each(|r| println!("E_{} -> Q_{}[label=\"{:?}\"]", r.e_name.replace("-", "_").replace(".", "_").replace("@", "_"), r.q_name.replace("-", "_").replace(".", "_").replace("@", "_"), r.routing_key));
-    println!("}}");
+        .for_each(|r| writeln!(graph_string, "E_{} -> Q_{}[label=\"{:?}\"]", r.e_name.replace("-", "_").replace(".", "_").replace("@", "_"), r.q_name.replace("-", "_").replace(".", "_").replace("@", "_"), r.routing_key).unwrap());
+    writeln!(graph_string, "}}").unwrap();
+    trace!("{}", graph_string);
 }
 
 async fn store_queue(conn: &PgPool, declare: &QueueDeclare) {
