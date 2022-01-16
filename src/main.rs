@@ -25,10 +25,7 @@ async fn main() {
         if !Command::new(sqlx_path)
             .args(["migrate", "info"])
             .spawn()
-            .expect(&format!(
-                "Expected sqlx spawn to work for path '{}'",
-                sqlx_path
-            ))
+            .unwrap_or_else(|_| panic!("Expected sqlx spawn to work for path '{}'", sqlx_path))
             .wait()
             .expect("Migration failure")
             .success()
@@ -39,10 +36,7 @@ async fn main() {
         if !Command::new(sqlx_path)
             .args(["migrate", "run"])
             .spawn()
-            .expect(&format!(
-                "Expected sqlx spawn to work for path '{}'",
-                sqlx_path
-            ))
+            .unwrap_or_else(|_| panic!("Expected sqlx spawn to work for path '{}'", sqlx_path))
             .wait()
             .expect("Migration failure")
             .success()
