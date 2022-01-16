@@ -604,7 +604,11 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                                     AMQPClass::Basic(BasicMethods::GetOk(GetOk {
                                         delivery_tag: 1,
                                         redelivered: false,
-                                        exchange: ShortString::from(message.exchange.clone()),
+                                        exchange: message
+                                            .exchange
+                                            .as_ref()
+                                            .map(|e| ShortString::from(e.clone()))
+                                            .unwrap_or_default(),
                                         routing_key: ShortString::from(
                                             message.routing_key.as_ref().cloned().unwrap(),
                                         ),
@@ -684,7 +688,7 @@ struct DbMessage {
     id: Uuid,
     arguments: serde_json::Value,
     body: Vec<u8>,
-    exchange: String,
+    exchange: Option<String>,
     routing_key: Option<String>,
     correlation_id: Option<String>,
     reply_to: Option<String>,
@@ -748,7 +752,7 @@ async fn send_msg(
 
 async fn get_db_message(conn: &PgPool, queue_name: &str) -> Result<DbMessage, sqlx::Error> {
     sqlx::query_as!(DbMessage,
-        "SELECT message.id as id, message.arguments, body, exc._name as exchange, routing_key, correlation_id, reply_to, delivery_mode, _priority, content_type, content_encoding FROM message LEFT JOIN exchange exc ON exc.id = message.exchange_id WHERE queue_id IN (SELECT id FROM queue WHERE _name = $1) AND consumed_at IS NULL ORDER by recieved_at LIMIT 1"
+        "SELECT message.id as id, message.arguments, body, exc._name as \"exchange?\", routing_key, correlation_id, reply_to, delivery_mode, _priority, content_type, content_encoding FROM message LEFT JOIN exchange exc ON exc.id = message.exchange_id WHERE queue_id IN (SELECT id FROM queue WHERE _name = $1) AND consumed_at IS NULL ORDER BY recieved_at LIMIT 1"
         , queue_name)
         .fetch_one(conn)
         .await
@@ -783,7 +787,11 @@ async fn delivery(
                         consumer_tag: consumer_tag_ss.clone(),
                         delivery_tag,
                         redelivered: false,
-                        exchange: ShortString::from(message.exchange.clone()),
+                        exchange: message
+                            .exchange
+                            .as_ref()
+                            .map(|e| ShortString::from(e.clone()))
+                            .unwrap_or_default(),
                         routing_key: ShortString::from(routing_key.clone()),
                     })),
                 ))

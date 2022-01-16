@@ -18,28 +18,8 @@
       ]
     }
   },
-  "338326815b0ff37bda1159cb253334a5f7fa054bfbf3f744e2942ee362194049": {
-    "query": "SELECT id FROM exchange WHERE _name = $1",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        false
-      ]
-    }
-  },
-  "45fb2761959e40d13531689e4a9b6adc097b561131f1ecd4dbe8d59689b08d85": {
-    "query": "SELECT message.id as id, message.arguments, body, exc._name as exchange, routing_key, correlation_id, reply_to, delivery_mode, _priority, content_type, content_encoding FROM message LEFT JOIN exchange exc ON exc.id = message.exchange_id WHERE queue_id IN (SELECT id FROM queue WHERE _name = $1) AND consumed_at IS NULL ORDER by recieved_at LIMIT 1",
+  "1b09443a855fc883de8af051da48e9a4f7ac5e769889ff10624b5ed4565b9d36": {
+    "query": "SELECT message.id as id, message.arguments, body, exc._name as \"exchange?\", routing_key, correlation_id, reply_to, delivery_mode, _priority, content_type, content_encoding FROM message LEFT JOIN exchange exc ON exc.id = message.exchange_id WHERE queue_id IN (SELECT id FROM queue WHERE _name = $1) AND consumed_at IS NULL ORDER BY recieved_at LIMIT 1",
     "describe": {
       "columns": [
         {
@@ -59,7 +39,7 @@
         },
         {
           "ordinal": 3,
-          "name": "exchange",
+          "name": "exchange?",
           "type_info": "Varchar"
         },
         {
@@ -115,6 +95,26 @@
         true,
         true,
         true
+      ]
+    }
+  },
+  "338326815b0ff37bda1159cb253334a5f7fa054bfbf3f744e2942ee362194049": {
+    "query": "SELECT id FROM exchange WHERE _name = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false
       ]
     }
   },
