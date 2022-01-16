@@ -1,0 +1,27 @@
+FROM alpine:3.13 as builder
+
+RUN apk add --no-cache rustup gcc musl-dev file pkgconfig
+RUN rustup-init -y --default-host x86_64-unknown-linux-musl --profile minimal
+ENV PATH=$PATH:/root/.cargo/bin
+
+WORKDIR /app
+
+# Creating a new dummy project
+RUN cargo init
+# Replacing with the desired dependencies
+COPY Cargo.lock Cargo.toml /app/
+# Build deps
+RUN cargo build --release --target=x86_64-unknown-linux-musl
+# Deleting the dummy project, leaving an environment ready to `run`
+RUN rm src/* -rf
+
+ADD . ./
+ENV SQLX_OFFLINE=true
+RUN cargo build --release --target=x86_64-unknown-linux-musl
+RUN strip ./target/x86_64-unknown-linux-musl/release/cavalcade
+RUN file ./target/x86_64-unknown-linux-musl/release/cavalcade
+RUN ls -lh ./target/x86_64-unknown-linux-musl/release/cavalcade
+
+FROM scratch
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/cavalcade /cavalcade
+ENTRYPOINT ["/cavalcade"]
