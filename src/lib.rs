@@ -57,7 +57,10 @@ async fn get_db_connection() -> Result<PgPool> {
     dotenv().ok();
 
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    return PgPool::connect(&database_url).await.map_err(|e| e.into());
+    return PgPool::connect(&database_url).await.map_err(|e| {
+        let ae: anyhow::Error = e.into();
+        return ae.context(format!("Trying to connect to {}", database_url));
+    });
 }
 
 pub async fn server() -> Result<()> {
