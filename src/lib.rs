@@ -599,10 +599,11 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                         .unwrap();
                         match get_db_message(&conn, &queue_name).await {
                             Ok(message) => {
+                                let delivery_tag = set_delivery_tag(&conn, &message).await;
                                 sender.send(AMQPFrame::Method(
                                     channel,
                                     AMQPClass::Basic(BasicMethods::GetOk(GetOk {
-                                        delivery_tag: 1,
+                                        delivery_tag: delivery_tag,
                                         redelivered: false,
                                         exchange: message
                                             .exchange
@@ -758,6 +759,10 @@ async fn get_db_message(conn: &PgPool, queue_name: &str) -> Result<DbMessage, sq
         .await
 }
 
+async fn set_delivery_tag(conn: &PgPool, message: &DbMessage) -> u64 {
+    sqlx::query!("UPDATE message SET delivery_tag = nextval('delivery_tag_seq') WHERE id = $1 RETURNING delivery_tag", message.id).fetch_one(conn).await.unwrap().delivery_tag.unwrap() as u64
+}
+
 async fn delivery(
     conn: PgPool,
     sender: UnboundedSender<AMQPFrame>,
@@ -765,8 +770,6 @@ async fn delivery(
     queue_name: String,
     consumer_tag: String,
 ) {
-    let mut delivery_tag: u64 = 1;
-
     debug!("Delivery thread for {}, {}", queue_name, consumer_tag);
 
     let consumer_tag_ss = ShortString::from(consumer_tag);
@@ -780,6 +783,7 @@ async fn delivery(
                 .as_ref()
                 .cloned()
                 .unwrap_or_else(|| String::from(""));
+            let delivery_tag = set_delivery_tag(&conn, &message).await;
             sender
                 .send(AMQPFrame::Method(
                     channel,
@@ -797,7 +801,6 @@ async fn delivery(
                 ))
                 .unwrap();
             send_msg(&conn, sender.clone(), channel, message).await;
-            delivery_tag += 1;
             tx.commit().await.unwrap();
         } else {
             tx.rollback().await.unwrap();

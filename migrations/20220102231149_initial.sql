@@ -22,6 +22,8 @@ CREATE TABLE exchange (
     UNIQUE(_name)
 );
 
+CREATE SEQUENCE delivery_tag_seq;
+
 CREATE TABLE message (
     id UUID PRIMARY KEY,
     arguments JSONB NOT NULL,
@@ -38,6 +40,7 @@ CREATE TABLE message (
     routing_key VARCHAR (256) NULL,
     content_type VARCHAR(256) NULL,
     content_encoding VARCHAR(256) NULL,
+    delivery_tag INT8 NULL,
     FOREIGN KEY (exchange_id) REFERENCES exchange (id),
     FOREIGN KEY (queue_id) REFERENCES queue (id)
 );
