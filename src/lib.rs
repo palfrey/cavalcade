@@ -476,7 +476,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             version_major: 0,
                             version_minor: 1,
                             server_properties: FieldTable::default(),
-                            mechanisms: LongString::from("PLAIN"),
+                            mechanisms: LongString::from("PLAIN,AMQPLAIN"),
                             locales: LongString::from("en_US"),
                         })),
                     ))?;
@@ -488,22 +488,28 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
             AMQPFrame::Method(channel, method) => match method {
                 AMQPClass::Connection(connmethod) => match connmethod {
                     ConnMethods::StartOk(start_ok) => {
-                        if start_ok.mechanism != ShortString::from("PLAIN") {
-                            todo!("Unknown auth mechanism: {}", start_ok.mechanism);
-                        }
-                        lazy_static! {
-                            static ref NULL_SPLIT: BytesRegex = BytesRegex::new("\u{0}").unwrap();
-                        }
-                        let bytes_response = start_ok.response.as_str().as_bytes();
-                        let login: Vec<_> = NULL_SPLIT
-                            .splitn(bytes_response, 3)
-                            .map(String::from_utf8_lossy)
-                            .collect();
-                        debug!("Login {:?}", login);
-                        if login.get(1).unwrap_or(&Cow::from("")) != "guest"
-                            || login.get(2).unwrap_or(&Cow::from("")) != "guest"
-                        {
-                            todo!("Support non guest/guest logins");
+                        let mechanism = start_ok.mechanism.to_string();
+                        match mechanism.as_str() {
+                            "PLAIN" => {
+                                lazy_static! {
+                                    static ref NULL_SPLIT: BytesRegex =
+                                        BytesRegex::new("\u{0}").unwrap();
+                                }
+                                let bytes_response = start_ok.response.as_str().as_bytes();
+                                let login: Vec<_> = NULL_SPLIT
+                                    .splitn(bytes_response, 3)
+                                    .map(String::from_utf8_lossy)
+                                    .collect();
+                                debug!("Login {:?}", login);
+                                if login.get(1).unwrap_or(&Cow::from("")) != "guest"
+                                    || login.get(2).unwrap_or(&Cow::from("")) != "guest"
+                                {
+                                    todo!("Support non guest/guest logins");
+                                }
+                            }
+                            _ => {
+                                todo!("Unknown auth mechanism: {}", mechanism)
+                            }
                         }
                         sender.send(AMQPFrame::Method(
                             0,
