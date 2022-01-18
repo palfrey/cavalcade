@@ -1,4 +1,5 @@
 use amq_protocol::{
+    auth::Credentials,
     frame::{AMQPContentHeader, AMQPFrame, ProtocolVersion, WriteContext},
     protocol::{
         basic::{
@@ -20,6 +21,7 @@ use amq_protocol::{
         AMQPClass,
     },
     types::{AMQPValue, FieldTable, LongString, ShortString},
+    uri::SASLMechanism,
 };
 use anyhow::{bail, Result};
 use chrono::Utc;
@@ -504,6 +506,15 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                                 if login.get(1).unwrap_or(&Cow::from("")) != "guest"
                                     || login.get(2).unwrap_or(&Cow::from("")) != "guest"
                                 {
+                                    todo!("Support non guest/guest logins");
+                                }
+                            }
+                            "AMQPLAIN" => {
+                                let response = start_ok.response.to_string();
+                                let expected =
+                                    Credentials::new("guest".to_string(), "guest".to_string())
+                                        .sasl_auth_string(SASLMechanism::AMQPlain);
+                                if response != expected {
                                     todo!("Support non guest/guest logins");
                                 }
                             }
