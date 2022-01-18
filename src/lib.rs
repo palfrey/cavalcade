@@ -478,7 +478,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             version_major: 0,
                             version_minor: 1,
                             server_properties: FieldTable::default(),
-                            mechanisms: LongString::from("PLAIN,AMQPLAIN"),
+                            mechanisms: LongString::from("PLAIN AMQPLAIN"),
                             locales: LongString::from("en_US"),
                         })),
                     ))?;
