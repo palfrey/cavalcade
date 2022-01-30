@@ -2,6 +2,7 @@
 edition = "2021"
 name = "cavalcade"
 version = "0.1.0"
+license = "AGPL3"
 
 [dependencies]
 amq-protocol = { version = "6", features = ["rustls"], default_features = false }
