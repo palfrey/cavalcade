@@ -23,16 +23,18 @@ use amq_protocol::{
     types::{AMQPValue, FieldTable, LongString, ShortString},
     uri::SASLMechanism,
 };
-use anyhow::{bail, Result};
+use anyhow::Result;
 use chrono::Utc;
 use dotenv::dotenv;
 use lazy_static::lazy_static;
 use log::{debug, error, info, trace, warn};
 use regex::{bytes::Regex as BytesRegex, Regex};
 use sqlx::PgPool;
-use std::{borrow::Cow, collections::BTreeMap, env, fmt::Write, fs, ops::Deref, time::Duration};
+use std::{
+    borrow::Cow, collections::BTreeMap, env, fmt::Write, fs, io, ops::Deref, time::Duration,
+};
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::AsyncWriteExt,
     net::{
         tcp::{OwnedReadHalf, OwnedWriteHalf},
         TcpListener, TcpStream,
@@ -114,16 +116,22 @@ impl ConnectionReader {
 
             // Read into the buffer, tracking the number
             // of bytes read
-            let n = self.stream.read(&mut self.buffer[self.cursor..]).await?;
-            if 0 == n {
-                if self.cursor == 0 {
-                    return Ok(None);
-                } else {
-                    bail!("connection reset by peer");
+            self.stream.readable().await?;
+            match self.stream.try_read(&mut self.buffer[self.cursor..]) {
+                Ok(n) => {
+                    if n == 0 && self.cursor == 0 {
+                        info!("Out of bytes");
+                        return Ok(None);
+                    }
+                    self.cursor += n;
                 }
-            } else {
-                // Update our cursor
-                self.cursor += n;
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    continue;
+                }
+                Err(e) => {
+                    warn!("Error on read: {}", e);
+                    return Err(e.into());
+                }
             }
         }
     }
@@ -133,33 +141,39 @@ impl ConnectionReader {
     }
 }
 
+#[derive(Debug)]
+pub enum ConnWriterMessage {
+    Frame(AMQPFrame),
+    Close,
+}
+
 pub struct ConnectionWriter {
     stream: OwnedWriteHalf,
-    receiver: UnboundedReceiver<AMQPFrame>,
+    receiver: UnboundedReceiver<ConnWriterMessage>,
 }
 
 impl ConnectionWriter {
-    pub fn new(stream: OwnedWriteHalf, receiver: UnboundedReceiver<AMQPFrame>) -> Self {
+    pub fn new(stream: OwnedWriteHalf, receiver: UnboundedReceiver<ConnWriterMessage>) -> Self {
         Self { stream, receiver }
     }
 
     async fn run(mut self) {
         debug!("Waiting for frame");
         loop {
-            let msg = self.receiver.recv().await;
-            if let Some(frame) = msg {
-                match self.write_frame(frame).await {
+            match self.receiver.recv().await.unwrap() {
+                ConnWriterMessage::Frame(frame) => match self.write_frame(frame).await {
                     Ok(_) => {}
                     Err(err) => {
                         warn!("Error writing frame, so breaking: {}", err);
                         break;
                     }
+                },
+                ConnWriterMessage::Close => {
+                    let _ = self.close().await;
+                    break;
                 }
-            } else {
-                break;
             }
         }
-        let _ = self.close().await;
     }
 
     async fn write_frame(&mut self, frame: AMQPFrame) -> Result<()> {
@@ -434,9 +448,9 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
     let (read_half, write_half) = socket.into_split();
 
     let mut connection = ConnectionReader::new(read_half);
-    let (sender, receiver) = mpsc::unbounded_channel::<AMQPFrame>();
+    let (sender, receiver) = mpsc::unbounded_channel::<ConnWriterMessage>();
 
-    tokio::task::spawn(async move {
+    let writer_task = tokio::task::spawn(async move {
         ConnectionWriter::new(write_half, receiver).run().await;
     });
 
@@ -472,7 +486,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
         match frame {
             AMQPFrame::ProtocolHeader(version) => {
                 if version == ProtocolVersion::amqp_0_9_1() {
-                    sender.send(AMQPFrame::Method(
+                    sender.send(ConnWriterMessage::Frame(AMQPFrame::Method(
                         0,
                         AMQPClass::Connection(ConnMethods::Start(Start {
                             version_major: 0,
@@ -481,9 +495,11 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             mechanisms: LongString::from("PLAIN AMQPLAIN"),
                             locales: LongString::from("en_US"),
                         })),
-                    ))?;
+                    )))?;
                 } else {
-                    sender.send(AMQPFrame::ProtocolHeader(ProtocolVersion::amqp_0_9_1()))?;
+                    sender.send(ConnWriterMessage::Frame(AMQPFrame::ProtocolHeader(
+                        ProtocolVersion::amqp_0_9_1(),
+                    )))?;
                     break;
                 }
             }
@@ -522,65 +538,65 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                                 todo!("Unknown auth mechanism: {}", mechanism)
                             }
                         }
-                        sender.send(AMQPFrame::Method(
+                        sender.send(ConnWriterMessage::Frame(AMQPFrame::Method(
                             0,
                             AMQPClass::Connection(ConnMethods::Tune(Tune {
                                 channel_max: 1000,
                                 frame_max: 1000,
                                 heartbeat: 1000,
                             })),
-                        ))?;
+                        )))?;
                     }
                     ConnMethods::Close(_close) => {
-                        sender.send(AMQPFrame::Method(
+                        sender.send(ConnWriterMessage::Frame(AMQPFrame::Method(
                             0,
                             AMQPClass::Connection(ConnMethods::CloseOk(ConnCloseOk {})),
-                        ))?;
+                        )))?;
                     }
                     ConnMethods::TuneOk(_) => {}
                     ConnMethods::Open(open) => {
                         if open.virtual_host == ShortString::from("/") {
-                            sender.send(AMQPFrame::Method(
+                            sender.send(ConnWriterMessage::Frame(AMQPFrame::Method(
                                 0,
                                 AMQPClass::Connection(ConnMethods::OpenOk(ConnOpenOk {})),
-                            ))?;
+                            )))?;
                         }
                     }
                     _ => todo!("No implementation for {:?}", connmethod),
                 },
                 AMQPClass::Channel(chanmethod) => match chanmethod {
                     ChanMethods::Open(_open) => {
-                        sender.send(AMQPFrame::Method(
+                        sender.send(ConnWriterMessage::Frame(AMQPFrame::Method(
                             channel,
                             AMQPClass::Channel(ChanMethods::OpenOk(ChanOpenOk {})),
-                        ))?;
+                        )))?;
                     }
                     ChanMethods::Close(_close) => {
-                        sender.send(AMQPFrame::Method(
+                        sender.send(ConnWriterMessage::Frame(AMQPFrame::Method(
                             channel,
                             AMQPClass::Channel(ChanMethods::CloseOk(ChanCloseOk {})),
-                        ))?;
+                        )))?;
                     }
                     _ => todo!("No implementation for {:?}", chanmethod),
                 },
                 AMQPClass::Queue(queuemethod) => match queuemethod {
                     QueueMethods::Declare(declare) => {
                         store_queue(&conn, &declare).await;
-                        sender.send(AMQPFrame::Method(
+                        sender.send(ConnWriterMessage::Frame(AMQPFrame::Method(
                             channel,
                             AMQPClass::Queue(QueueMethods::DeclareOk(QueueDeclareOk {
                                 queue: declare.queue,
                                 message_count: 0,
                                 consumer_count: 0,
                             })),
-                        ))?;
+                        )))?;
                     }
                     QueueMethods::Bind(bind) => {
                         store_bind(&conn, &bind).await;
-                        sender.send(AMQPFrame::Method(
+                        sender.send(ConnWriterMessage::Frame(AMQPFrame::Method(
                             channel,
                             AMQPClass::Queue(QueueMethods::BindOk(QueueBindOk {})),
-                        ))?;
+                        )))?;
                     }
                     _ => todo!("No implementation for {:?}", queuemethod),
                 },
@@ -592,10 +608,10 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                         current_message.routing_key = Some(publish.routing_key.to_string());
                     }
                     BasicMethods::Qos(_qos) => {
-                        sender.send(AMQPFrame::Method(
+                        sender.send(ConnWriterMessage::Frame(AMQPFrame::Method(
                             channel,
                             AMQPClass::Basic(BasicMethods::QosOk(QosOk {})),
-                        ))?;
+                        )))?;
                     }
                     BasicMethods::Consume(consume) => {
                         tokio::spawn(delivery(
@@ -605,20 +621,20 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                             consume.queue.to_string(),
                             consume.consumer_tag.to_string(),
                         ));
-                        sender.send(AMQPFrame::Method(
+                        sender.send(ConnWriterMessage::Frame(AMQPFrame::Method(
                             channel,
                             AMQPClass::Basic(BasicMethods::ConsumeOk(ConsumeOk {
                                 consumer_tag: consume.consumer_tag,
                             })),
-                        ))?;
+                        )))?;
                     }
                     BasicMethods::Cancel(cancel) => {
-                        sender.send(AMQPFrame::Method(
+                        sender.send(ConnWriterMessage::Frame(AMQPFrame::Method(
                             channel,
                             AMQPClass::Basic(BasicMethods::CancelOk(CancelOk {
                                 consumer_tag: cancel.consumer_tag,
                             })),
-                        ))?;
+                        )))?;
                     }
                     BasicMethods::Get(get) => {
                         let queue_name = get.queue.to_string();
@@ -632,7 +648,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                         match get_db_message(&conn, &queue_name).await {
                             Ok(message) => {
                                 let delivery_tag = set_delivery_tag(&conn, &message).await;
-                                sender.send(AMQPFrame::Method(
+                                sender.send(ConnWriterMessage::Frame(AMQPFrame::Method(
                                     channel,
                                     AMQPClass::Basic(BasicMethods::GetOk(GetOk {
                                         delivery_tag,
@@ -647,14 +663,14 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                                         ),
                                         message_count: queue.count.unwrap() as u32,
                                     })),
-                                ))?;
+                                )))?;
                                 send_msg(&conn, sender.clone(), channel, message).await;
                             }
                             Err(_) => {
-                                sender.send(AMQPFrame::Method(
+                                sender.send(ConnWriterMessage::Frame(AMQPFrame::Method(
                                     channel,
                                     AMQPClass::Basic(BasicMethods::GetEmpty(GetEmpty {})),
-                                ))?;
+                                )))?;
                             }
                         }
                     }
@@ -682,10 +698,10 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                     ExchangeMethods::Declare(declare) => {
                         debug!("Declared exchange {}", declare.exchange);
                         store_exchange(&conn, &declare).await;
-                        sender.send(AMQPFrame::Method(
+                        sender.send(ConnWriterMessage::Frame(AMQPFrame::Method(
                             channel,
                             AMQPClass::Exchange(ExchangeMethods::DeclareOk(ExchangeDeclareOk {})),
-                        ))?;
+                        )))?;
                     }
                     _ => todo!("No implementation for {:?}", exchangemethod),
                 },
@@ -730,6 +746,9 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
             AMQPFrame::Heartbeat(_channel) => {}
         }
     }
+    sender.send(ConnWriterMessage::Close).unwrap();
+    info!("Waiting for writer to end");
+    writer_task.await?;
     info!("end process");
     Ok(())
 }
@@ -750,7 +769,7 @@ struct DbMessage {
 
 async fn send_msg(
     conn: &PgPool,
-    sender: UnboundedSender<AMQPFrame>,
+    sender: UnboundedSender<ConnWriterMessage>,
     channel: u16,
     message: DbMessage,
 ) {
@@ -778,7 +797,7 @@ async fn send_msg(
         properties = properties.with_content_encoding(ShortString::from(content_encoding));
     }
     sender
-        .send(AMQPFrame::Header(
+        .send(ConnWriterMessage::Frame(AMQPFrame::Header(
             channel,
             60,
             Box::new(AMQPContentHeader {
@@ -787,9 +806,14 @@ async fn send_msg(
                 body_size: message.body.len() as u64,
                 properties,
             }),
-        ))
+        )))
         .unwrap();
-    sender.send(AMQPFrame::Body(channel, message.body)).unwrap();
+    sender
+        .send(ConnWriterMessage::Frame(AMQPFrame::Body(
+            channel,
+            message.body,
+        )))
+        .unwrap();
     sqlx::query!(
         "UPDATE message SET consumed_by = $1, consumed_at = now() WHERE id = $2",
         NODE_ID.deref(),
@@ -814,7 +838,7 @@ async fn set_delivery_tag(conn: &PgPool, message: &DbMessage) -> u64 {
 
 async fn delivery(
     conn: PgPool,
-    sender: UnboundedSender<AMQPFrame>,
+    sender: UnboundedSender<ConnWriterMessage>,
     channel: u16,
     queue_name: String,
     consumer_tag: String,
@@ -833,23 +857,29 @@ async fn delivery(
                 .cloned()
                 .unwrap_or_else(|| String::from(""));
             let delivery_tag = set_delivery_tag(&conn, &message).await;
-            sender
-                .send(AMQPFrame::Method(
-                    channel,
-                    AMQPClass::Basic(BasicMethods::Deliver(Deliver {
-                        consumer_tag: consumer_tag_ss.clone(),
-                        delivery_tag,
-                        redelivered: false,
-                        exchange: message
-                            .exchange
-                            .as_ref()
-                            .map(|e| ShortString::from(e.clone()))
-                            .unwrap_or_default(),
-                        routing_key: ShortString::from(routing_key.clone()),
-                    })),
-                ))
-                .unwrap();
-            send_msg(&conn, sender.clone(), channel, message).await;
+            match sender.send(ConnWriterMessage::Frame(AMQPFrame::Method(
+                channel,
+                AMQPClass::Basic(BasicMethods::Deliver(Deliver {
+                    consumer_tag: consumer_tag_ss.clone(),
+                    delivery_tag,
+                    redelivered: false,
+                    exchange: message
+                        .exchange
+                        .as_ref()
+                        .map(|e| ShortString::from(e.clone()))
+                        .unwrap_or_default(),
+                    routing_key: ShortString::from(routing_key.clone()),
+                })),
+            ))) {
+                Ok(_) => {
+                    send_msg(&conn, sender.clone(), channel, message).await;
+                }
+                Err(err) => {
+                    warn!("Error trying to send deliver {}", err);
+                    break;
+                }
+            }
+
             tx.commit().await.unwrap();
         } else {
             tx.rollback().await.unwrap();
