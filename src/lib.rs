@@ -177,7 +177,7 @@ impl ConnectionWriter {
         .unwrap()
         .into_inner()
         .0;
-        self.stream.write(&write_buffer).await?;
+        let _ = self.stream.write(&write_buffer).await?;
         Ok(())
     }
 
@@ -204,9 +204,9 @@ async fn dump_dot(conn: &PgPool) {
                 graph_string,
                 "Q_{}[label=\"Q: {}\"]",
                 r._name
-                    .replace("-", "_")
-                    .replace(".", "_")
-                    .replace("@", "_"),
+                    .replace('-', "_")
+                    .replace('.', "_")
+                    .replace('@', "_"),
                 r._name
             )
             .unwrap();
@@ -221,9 +221,9 @@ async fn dump_dot(conn: &PgPool) {
                 graph_string,
                 "E_{}[label=\"E: {}\"]",
                 r._name
-                    .replace("-", "_")
-                    .replace(".", "_")
-                    .replace("@", "_"),
+                    .replace('-', "_")
+                    .replace('.', "_")
+                    .replace('@', "_"),
                 r._name
             )
             .unwrap();
@@ -233,7 +233,7 @@ async fn dump_dot(conn: &PgPool) {
         .await
         .unwrap()
         .into_iter()
-        .for_each(|r| writeln!(graph_string, "E_{} -> Q_{}[label=\"{:?}\"]", r.e_name.replace("-", "_").replace(".", "_").replace("@", "_"), r.q_name.replace("-", "_").replace(".", "_").replace("@", "_"), r.routing_key).unwrap());
+        .for_each(|r| writeln!(graph_string, "E_{} -> Q_{}[label=\"{:?}\"]", r.e_name.replace('-', "_").replace('.', "_").replace('@', "_"), r.q_name.replace('-', "_").replace('.', "_").replace('@', "_"), r.routing_key).unwrap());
     writeln!(graph_string, "}}").unwrap();
     trace!("{}", graph_string);
 }
