@@ -1,6 +1,6 @@
 Cavalcade
 =========
-[![Continuous integration](https://github.com/palfrey/cavalcade/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/palfrey/cavalcade/actions/workflows/ci.yml) 
+[![Continuous integration](https://github.com/palfrey/cavalcade/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/palfrey/cavalcade/actions/workflows/ci.yml)
 [![Docker Pulls](https://img.shields.io/docker/pulls/palfrey/cavalcade)](https://hub.docker.com/r/palfrey/cavalcade)
 [![Docker Image Version (latest semver)](https://img.shields.io/docker/v/palfrey/cavalcade)](https://hub.docker.com/r/palfrey/cavalcade)
 
