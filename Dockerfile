@@ -1,6 +1,6 @@
-FROM rust:1.57
+FROM rust:1.66
 WORKDIR /work
-RUN cargo install sqlx-cli --no-default-features --features postgres,rustls
+RUN cargo install sqlx-cli --version ^0.5 --no-default-features --features postgres,rustls
 RUN wget https://github.com/palfrey/wait-for-db/releases/download/v1.2.0/wait-for-db-linux-x86 && chmod +x wait-for-db-linux-x86 && mv wait-for-db-linux-x86 /usr/local/bin/wait-for-db
 
 # Creating a new dummy project
