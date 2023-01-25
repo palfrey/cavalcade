@@ -8,7 +8,7 @@ WORKDIR /app
 
 RUN wget https://github.com/palfrey/wait-for-db/releases/download/v1.2.0/wait-for-db-linux-x86 && chmod +x wait-for-db-linux-x86
 
-RUN cargo install sqlx-cli --no-default-features --features postgres,rustls --target=x86_64-unknown-linux-musl
+RUN cargo install sqlx-cli --version ^0.5 --no-default-features --features postgres,rustls --target=x86_64-unknown-linux-musl
 RUN strip /root/.cargo/bin/sqlx
 RUN file /root/.cargo/bin/sqlx
 RUN ls -lh /root/.cargo/bin/sqlx
