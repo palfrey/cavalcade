@@ -5,10 +5,10 @@ version = "0.1.0"
 license = "AGPL3"
 
 [dependencies]
-amq-protocol = { version = "6", features = ["rustls"], default_features = false }
+amq-protocol = { version = "7", features = ["rustls"], default_features = false }
 anyhow = "1"
 bytes = "1"
-chrono = "0.4"
+chrono = "0.4.23"
 clap = { version = "3", default_features = false, features = ["cargo", "std"] }
 dotenv = "0.15.0"
 lazy_static = "1"
@@ -22,5 +22,5 @@ tokio = { version = "1", features = ["net", "io-util", "rt", "macros", "rt-multi
 uuid = { version = "0.8", features = ["v4"] }
 
 [dev-dependencies]
-celery = "0.4.0-rcn.11"
+celery = "0.5.3"
 serial_test = "0.5"

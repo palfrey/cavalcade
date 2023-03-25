@@ -491,7 +491,7 @@ async fn process(conn: PgPool, socket: TcpStream) -> Result<()> {
                                     static ref NULL_SPLIT: BytesRegex =
                                         BytesRegex::new("\u{0}").unwrap();
                                 }
-                                let bytes_response = start_ok.response.as_str().as_bytes();
+                                let bytes_response = start_ok.response.as_bytes();
                                 let login: Vec<_> = NULL_SPLIT
                                     .splitn(bytes_response, 3)
                                     .map(String::from_utf8_lossy)
@@ -777,7 +777,6 @@ async fn send_msg(
             60,
             Box::new(AMQPContentHeader {
                 class_id: 60,
-                weight: 0,
                 body_size: message.body.len() as u64,
                 properties,
             }),
