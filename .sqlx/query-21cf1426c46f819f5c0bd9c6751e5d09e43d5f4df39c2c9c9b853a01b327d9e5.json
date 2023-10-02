@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE message SET delivery_tag = nextval('delivery_tag_seq') WHERE id = $1 RETURNING delivery_tag",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "delivery_tag",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "21cf1426c46f819f5c0bd9c6751e5d09e43d5f4df39c2c9c9b853a01b327d9e5"
+}

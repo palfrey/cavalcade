@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT routing_key, queue._name as \"q_name!\", exchange._name as \"e_name!\" FROM bind JOIN queue ON queue.id = queue_id JOIN exchange ON exchange.id = exchange_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "routing_key",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "q_name!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "e_name!",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "46c2ab3942516ea092d0f033e408bd5d18bb56db420f11d4b2f854d4ef6cc2ff"
+}

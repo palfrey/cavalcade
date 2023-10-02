@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO exchange (id, _name, _type, passive, durable, auto_delete, _nowait, arguments) VALUES(gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8a626bc06d292473557a66b7f473a646ff61c870885b5d4b87a848c80e32e289"
+}

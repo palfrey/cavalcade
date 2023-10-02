@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM message WHERE delivery_tag = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "494c0e49c3583f76d6a96d0ad7905306d5a6de5210f420a81bace81afec7a77b"
+}

@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT _name FROM exchange",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b3ebca91bd76182474a6b5329f98064c8fe4e40f4bfc5e52292e04d76622dacc"
+}
