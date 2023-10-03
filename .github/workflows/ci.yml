@@ -42,7 +42,7 @@ jobs:
               with:
                   cache-on-failure: true
             - name: Install sqlx-cli
-              run: cargo install sqlx-cli --version ^0.5 --no-default-features --features postgres,rustls
+              run: cargo install sqlx-cli --version ^0.7 --no-default-features --features postgres,rustls
             - name: Run migrations
               run: sqlx migrate run
             - name: Check sqlx prepare

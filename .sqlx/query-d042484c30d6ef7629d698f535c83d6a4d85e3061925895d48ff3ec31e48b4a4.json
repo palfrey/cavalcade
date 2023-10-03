@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO queue (id, _name, passive, durable, _exclusive, auto_delete, _nowait, arguments) VALUES(gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d042484c30d6ef7629d698f535c83d6a4d85e3061925895d48ff3ec31e48b4a4"
+}

@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO message (id, arguments, body, queue_id, recieved_at, consumed_at, consumed_by, routing_key, exchange_id, delivery_mode, _priority, correlation_id, reply_to, content_type, content_encoding) VALUES(gen_random_uuid(), $1, $2, (SELECT id from queue WHERE _name = $3), $4, NULL, NULL, $5, NULL, $6, $7, $8, $9, $10, $11)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Jsonb",
+        "Bytea",
+        "Text",
+        "Timestamp",
+        "Varchar",
+        "Int4",
+        "Int4",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "da24f0a107b4394e33d627905fd232ffae2b6b86158e88b361b0d29567a2636a"
+}

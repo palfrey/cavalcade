@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE exchange SET passive = $1, durable = $2, auto_delete = $3, _nowait = $4, arguments = $5\n            WHERE id = $6",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Jsonb",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9d0930e105442800649bc4f8e354115a5b0b2f87ceed504085ba4e9a4837f823"
+}

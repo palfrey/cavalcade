@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT bind.id as id, queue._name as queue_name, routing_key FROM bind JOIN queue ON queue.id = queue_id WHERE exchange_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "queue_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "routing_key",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "55c797db1549c5f9fa0f1528f1d7b9f84e1e3f23cc98b785f148490676679805"
+}

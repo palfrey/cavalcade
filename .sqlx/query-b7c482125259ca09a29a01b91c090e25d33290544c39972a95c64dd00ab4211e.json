@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE message SET consumed_at = NULL, consumed_by = NULL WHERE delivery_tag = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b7c482125259ca09a29a01b91c090e25d33290544c39972a95c64dd00ab4211e"
+}

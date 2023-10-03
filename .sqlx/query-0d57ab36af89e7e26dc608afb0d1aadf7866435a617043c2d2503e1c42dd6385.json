@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT _name FROM queue",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "0d57ab36af89e7e26dc608afb0d1aadf7866435a617043c2d2503e1c42dd6385"
+}
